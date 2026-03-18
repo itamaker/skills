@@ -1,0 +1,21 @@
+{
+  "name": "itamaker-skills",
+  "owner": {
+    "name": "Jonny"
+  },
+  "metadata": {
+    "description": "Reusable coding-agent skills from itamaker",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "itamaker-skills",
+      "description": "Collection of reusable skills including configurable Go workspace management",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/go-workspace-skills"
+      ]
+    }
+  ]
+}

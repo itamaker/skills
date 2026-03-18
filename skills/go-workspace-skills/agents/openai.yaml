@@ -1,0 +1,4 @@
+interface:
+  display_name: "Go Workspace Skills"
+  short_description: "Manage configurable multi-repo Go workspaces"
+  default_prompt: "Use $go-workspace-skills to manage this Go workspace from a config file."

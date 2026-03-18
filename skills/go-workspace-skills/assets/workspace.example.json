@@ -1,0 +1,19 @@
+{
+  "repos": [
+    {
+      "name": "example-cli",
+      "url": "https://github.com/example/example-cli.git",
+      "go_project": true
+    },
+    {
+      "name": "example-service",
+      "url": "https://github.com/example/example-service.git",
+      "go_project": true
+    },
+    {
+      "name": "homebrew-tap",
+      "url": "git@github.com:example/homebrew-tap.git",
+      "go_project": false
+    }
+  ]
+}
