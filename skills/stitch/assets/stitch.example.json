@@ -1,0 +1,24 @@
+{
+  "auth": {
+    "apiKey": "",
+    "accessToken": "",
+    "googleCloudProject": "",
+    "baseUrl": "https://stitch.googleapis.com/mcp",
+    "timeoutMs": 300000
+  },
+  "defaults": {
+    "projectId": "",
+    "deviceType": "DESKTOP",
+    "modelId": "GEMINI_3_PRO",
+    "variantCount": 3,
+    "creativeRange": "EXPLORE",
+    "variantAspects": [
+      "LAYOUT",
+      "COLOR_SCHEME"
+    ]
+  },
+  "runtime": {
+    "dir": "~/.cache/itamaker-skills/stitch-sdk",
+    "sdkPackage": "@google/stitch-sdk@0.0.3"
+  }
+}

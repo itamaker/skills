@@ -7,6 +7,7 @@ This repository is structured to work with the open `skills` installer ecosystem
 ## Available Skills
 
 - `go-workspace-skills`: Manage configurable multi-repo Go workspaces from a workspace config file.
+- `stitch`: Request Google Stitch through a bundled SDK runner, with configurable auth and generation parameters.
 
 ## Install
 
@@ -16,6 +17,9 @@ npx skills add itamaker/skills --list
 
 # Install go-workspace-skills
 npx skills add itamaker/skills --skill go-workspace-skills
+
+# Install stitch
+npx skills add itamaker/skills --skill stitch
 ```
 
 ### Install to specific agents
@@ -39,6 +43,12 @@ The `skills` CLI automatically discovers skills from the `skills/` directory in 
 ```text
 skills/
   go-workspace-skills/
+    SKILL.md
+    agents/
+    assets/
+    references/
+    scripts/
+  stitch/
     SKILL.md
     agents/
     assets/
@@ -106,6 +116,11 @@ After installation, ask your coding agent things like:
 - `Use $go-workspace-skills to build the workspace.`
 - `Use $go-workspace-skills to run workspace tests.`
 - `Use $go-workspace-skills to create a workspace config for this repo set.`
+- `Use $stitch to list my Stitch projects.`
+- `Use $stitch to create a Stitch project and generate a login screen.`
+- `Use $stitch to download the HTML for a Stitch screen into ./tmp/screen.html.`
+- `Use $stitch to save my Stitch auth and defaults into ./.stitch.json.`
+- `Use $stitch to write committed @google/stitch-sdk code for this app.`
 
 ## Future Skills
 

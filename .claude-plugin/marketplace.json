@@ -5,16 +5,17 @@
   },
   "metadata": {
     "description": "Reusable coding-agent skills from itamaker",
-    "version": "0.1.0"
+    "version": "0.3.1"
   },
   "plugins": [
     {
       "name": "itamaker-skills",
-      "description": "Collection of reusable skills including configurable Go workspace management",
+      "description": "Collection of reusable skills including configurable Go workspace management and Google Stitch workflows",
       "source": "./",
       "strict": false,
       "skills": [
-        "./skills/go-workspace-skills"
+        "./skills/go-workspace-skills",
+        "./skills/stitch"
       ]
     }
   ]

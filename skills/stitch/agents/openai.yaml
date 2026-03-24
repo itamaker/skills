@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stitch"
+  short_description: "Request Google Stitch with config and an SDK runner"
+  default_prompt: "Use $stitch to request the Stitch service, configure parameters, or write @google/stitch-sdk code."
