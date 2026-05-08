@@ -1,19 +1,32 @@
 # itamaker/skills
 
-This repository has been split into standalone skill repositories.
+A Claude Code plugin marketplace that indexes the standalone `itamaker` skill repositories. The skill source lives in those repos; this one only ships `.claude-plugin/marketplace.json`.
 
-## Repositories
+## Install via Claude Code
 
-- [`itamaker/go-workspace-skills`](https://github.com/itamaker/go-workspace-skills)
-  Install: `npx skills add itamaker/go-workspace-skills`
-- [`itamaker/stitch-skills`](https://github.com/itamaker/stitch-skills)
-  Install: `npx skills add itamaker/stitch-skills`
+Register the marketplace once, then install the skills you want:
 
-## Notes
+```text
+/plugin marketplace add itamaker/skills
+/plugin install stitch-skills@itamaker-skills
+/plugin install go-workspace-skills@itamaker-skills
+```
 
-- `go-workspace-skills` contains the configurable multi-repo Go workspace skill.
-- `stitch-skills` contains the Google Stitch skill and SDK-backed runner.
-- New updates should go to the standalone repositories above.
+## Install via the `skills` CLI
+
+```bash
+npx skills add itamaker/stitch-skills
+npx skills add itamaker/go-workspace-skills
+```
+
+## Skills in this marketplace
+
+- [`itamaker/stitch-skills`](https://github.com/itamaker/stitch-skills) — Google Stitch workflows with an SDK-backed runner.
+- [`itamaker/go-workspace-skills`](https://github.com/itamaker/go-workspace-skills) — configurable multi-repo Go workspace management.
+
+## Contributing
+
+New skill content goes into the standalone repositories above. This repo only changes when the marketplace metadata (`.claude-plugin/marketplace.json`) needs to add, remove, or repoint a skill.
 
 ## License
 
