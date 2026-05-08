@@ -19,6 +19,6 @@
   },
   "runtime": {
     "dir": "~/.cache/itamaker-skills/stitch-sdk",
-    "sdkPackage": "@google/stitch-sdk@0.0.3"
+    "sdkPackage": "@google/stitch-sdk@0.1.1"
   }
 }

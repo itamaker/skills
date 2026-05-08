@@ -2,6 +2,8 @@
 
 `DESIGN.md` is a plain-text design system document for agents. It plays the same role for visual consistency that `AGENTS.md` plays for engineering process.
 
+Stitch (`stitch.withgoogle.com`) reads and writes `DESIGN.md` natively: the canvas can extract a design system from any URL or codebase into `DESIGN.md`, and an existing `DESIGN.md` can be imported back to seed a project. When the user asks for a "design system" workflow, prefer authoring or updating this file alongside the SDK's `createDesignSystem` / `apply` calls so the agent-readable rules and the Stitch-side asset stay in sync.
+
 ## What it is for
 
 Use `DESIGN.md` when the user needs multiple generated screens to share one visual language:

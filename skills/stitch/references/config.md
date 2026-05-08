@@ -62,7 +62,7 @@ skills/stitch/scripts/run.sh save-config --config ./.stitch.json --api-key "$STI
   },
   "runtime": {
     "dir": "~/.cache/itamaker-skills/stitch-sdk",
-    "sdkPackage": "@google/stitch-sdk@0.0.3"
+    "sdkPackage": "@google/stitch-sdk@0.1.1"
   }
 }
 ```
@@ -79,7 +79,7 @@ skills/stitch/scripts/run.sh save-config --config ./.stitch.json --api-key "$STI
 - `auth.apiKey`: direct API key. Equivalent to `STITCH_API_KEY`.
 - `auth.accessToken`: OAuth access token. Equivalent to `STITCH_ACCESS_TOKEN`.
 - `auth.googleCloudProject`: required with OAuth. Equivalent to `GOOGLE_CLOUD_PROJECT`.
-- `auth.baseUrl`: optional Stitch MCP endpoint override.
+- `auth.baseUrl`: optional Stitch MCP endpoint override. Equivalent to `STITCH_HOST`.
 - `auth.timeoutMs`: request timeout in milliseconds.
 
 ## Default generation fields
@@ -94,7 +94,7 @@ skills/stitch/scripts/run.sh save-config --config ./.stitch.json --api-key "$STI
 ## Runtime fields
 
 - `runtime.dir`: where the runner installs `@google/stitch-sdk`.
-- `runtime.sdkPackage`: package spec to install on bootstrap. Defaults to `@google/stitch-sdk@0.0.3`.
+- `runtime.sdkPackage`: package spec to install on bootstrap. Defaults to `@google/stitch-sdk@0.1.1`. Pin a different version (for example `@google/stitch-sdk@next`) when the user wants to track preview releases.
 
 ## Operational advice
 

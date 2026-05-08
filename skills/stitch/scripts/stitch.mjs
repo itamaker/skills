@@ -16,7 +16,7 @@ const CONFIG_ENV_VAR = "STITCH_SKILL_CONFIG";
 const DEFAULT_CONFIG_NAMES = [".stitch.json", "stitch.json"];
 const DEFAULT_BASE_URL = "https://stitch.googleapis.com/mcp";
 const DEFAULT_TIMEOUT_MS = 300000;
-const DEFAULT_SDK_PACKAGE = "@google/stitch-sdk@0.0.3";
+const DEFAULT_SDK_PACKAGE = "@google/stitch-sdk@0.1.1";
 const DEFAULT_RUNTIME_DIR_TEMPLATE = "~/.cache/itamaker-skills/stitch-sdk";
 const DEFAULT_RUNTIME_DIR = path.join(
   process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache"),
@@ -59,6 +59,10 @@ Commands:
   generate         Generate a screen in a project
   edit             Edit an existing screen
   variants         Generate variants for a screen
+  list-design-systems    List design systems on a project
+  create-design-system   Create a design system on a project
+  update-design-system   Update an existing design system
+  apply-design-system    Apply a design system to selected screen instances
   download-html    Download a screen's HTML artifact
   download-image   Download a screen's image artifact
   list-tools       List low-level Stitch tools exposed by the SDK client
@@ -524,6 +528,42 @@ function normalizeScreen(screen, extras = {}) {
   };
 }
 
+function normalizeDesignSystem(designSystem, extras = {}) {
+  const data = designSystem.data ?? null;
+  return {
+    id: designSystem.id,
+    assetId: designSystem.assetId,
+    projectId: designSystem.projectId,
+    title: data?.title || data?.displayName || null,
+    data,
+    ...extras,
+  };
+}
+
+async function readJsonInput(values, { fileKey, jsonKey, label }) {
+  const inlineValue = values[jsonKey];
+  const fileValue = values[fileKey];
+  if (inlineValue && fileValue) {
+    fail(`Use either --${jsonKey} or --${fileKey}, not both.`);
+  }
+  if (inlineValue) {
+    try {
+      return JSON.parse(inlineValue);
+    } catch (error) {
+      fail(`Invalid JSON in --${jsonKey}: ${error.message}`);
+    }
+  }
+  if (fileValue) {
+    const raw = await fsp.readFile(resolveUserPath(fileValue), "utf8");
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      fail(`Invalid JSON in ${fileValue}: ${error.message}`);
+    }
+  }
+  fail(`Missing ${label}. Pass --${jsonKey} or --${fileKey}.`);
+}
+
 function printOutput(data, jsonMode) {
   if (jsonMode) {
     console.log(JSON.stringify(data, null, 2));
@@ -767,6 +807,88 @@ async function commandVariants(values, config) {
   }
 }
 
+async function commandListDesignSystems(values, config) {
+  const settings = resolvedSettings(config.data, values);
+  const projectId = requireProjectId(values, settings);
+  const { client, sdk } = await createSdk(settings);
+  try {
+    const project = sdk.project(projectId);
+    const designSystems = await project.listDesignSystems();
+    await maybePersistResolvedConfig(values, config, settings);
+    printOutput(designSystems.map(ds => normalizeDesignSystem(ds)), Boolean(values.json));
+  } finally {
+    await client.close();
+  }
+}
+
+async function commandCreateDesignSystem(values, config) {
+  const settings = resolvedSettings(config.data, values);
+  const projectId = requireProjectId(values, settings);
+  const designSystemPayload = await readJsonInput(values, {
+    fileKey: "design-system-file",
+    jsonKey: "design-system-json",
+    label: "design system payload",
+  });
+  const { client, sdk } = await createSdk(settings);
+  try {
+    const project = sdk.project(projectId);
+    const designSystem = await project.createDesignSystem(designSystemPayload);
+    await maybePersistResolvedConfig(values, config, settings);
+    printOutput(normalizeDesignSystem(designSystem), Boolean(values.json));
+  } finally {
+    await client.close();
+  }
+}
+
+async function commandUpdateDesignSystem(values, config) {
+  const settings = resolvedSettings(config.data, values);
+  const projectId = requireProjectId(values, settings);
+  if (!values["asset-id"]) {
+    fail("Missing --asset-id.");
+  }
+  const designSystemPayload = await readJsonInput(values, {
+    fileKey: "design-system-file",
+    jsonKey: "design-system-json",
+    label: "design system payload",
+  });
+  const { client, sdk } = await createSdk(settings);
+  try {
+    const project = sdk.project(projectId);
+    const designSystem = project.designSystem(values["asset-id"]);
+    const updated = await designSystem.update(designSystemPayload);
+    await maybePersistResolvedConfig(values, config, settings);
+    printOutput(normalizeDesignSystem(updated), Boolean(values.json));
+  } finally {
+    await client.close();
+  }
+}
+
+async function commandApplyDesignSystem(values, config) {
+  const settings = resolvedSettings(config.data, values);
+  const projectId = requireProjectId(values, settings);
+  if (!values["asset-id"]) {
+    fail("Missing --asset-id.");
+  }
+  const selections = await readJsonInput(values, {
+    fileKey: "selections-file",
+    jsonKey: "selections-json",
+    label: "selected screen instances",
+  });
+  if (!Array.isArray(selections)) {
+    fail("Selected screen instances must be a JSON array of { id, sourceScreen } objects.");
+  }
+  const { client, sdk } = await createSdk(settings);
+  try {
+    const project = sdk.project(projectId);
+    const designSystem = project.designSystem(values["asset-id"]);
+    const screens = await designSystem.apply(selections);
+    await maybePersistResolvedConfig(values, config, settings);
+    printOutput(screens.map(screen => normalizeScreen(screen)), Boolean(values.json));
+  } finally {
+    await client.close();
+  }
+}
+
 async function commandDownloadArtifact(values, config, kind) {
   const settings = resolvedSettings(config.data, values);
   const projectId = requireProjectId(values, settings);
@@ -846,6 +968,14 @@ function commandUsage(command) {
       "stitch edit --project-id <id> --screen-id <id> (--prompt <text> | --prompt-file <path>) [--device-type ...] [--model-id ...] [--html-out path] [--image-out path] [common-options]",
     "variants":
       "stitch variants --project-id <id> --screen-id <id> (--prompt <text> | --prompt-file <path>) [--variant-count n] [--creative-range ...] [--aspects a,b] [--device-type ...] [--model-id ...] [common-options]",
+    "list-design-systems":
+      "stitch list-design-systems --project-id <id> [common-options]",
+    "create-design-system":
+      "stitch create-design-system --project-id <id> (--design-system-file <path> | --design-system-json '{...}') [common-options]",
+    "update-design-system":
+      "stitch update-design-system --project-id <id> --asset-id <id> (--design-system-file <path> | --design-system-json '{...}') [common-options]",
+    "apply-design-system":
+      "stitch apply-design-system --project-id <id> --asset-id <id> (--selections-file <path> | --selections-json '[{...}]') [common-options]",
     "download-html":
       "stitch download-html --project-id <id> --screen-id <id> --out <path> [common-options]",
     "download-image":
@@ -987,6 +1117,46 @@ async function main() {
       });
       const config = await loadCommandConfig(values);
       await commandVariants(values, config);
+      return;
+    }
+    case "list-design-systems": {
+      const values = parseCommandArgs(rest, {
+        "project-id": { type: "string" },
+      });
+      const config = await loadCommandConfig(values);
+      await commandListDesignSystems(values, config);
+      return;
+    }
+    case "create-design-system": {
+      const values = parseCommandArgs(rest, {
+        "project-id": { type: "string" },
+        "design-system-file": { type: "string" },
+        "design-system-json": { type: "string" },
+      });
+      const config = await loadCommandConfig(values);
+      await commandCreateDesignSystem(values, config);
+      return;
+    }
+    case "update-design-system": {
+      const values = parseCommandArgs(rest, {
+        "project-id": { type: "string" },
+        "asset-id": { type: "string" },
+        "design-system-file": { type: "string" },
+        "design-system-json": { type: "string" },
+      });
+      const config = await loadCommandConfig(values);
+      await commandUpdateDesignSystem(values, config);
+      return;
+    }
+    case "apply-design-system": {
+      const values = parseCommandArgs(rest, {
+        "project-id": { type: "string" },
+        "asset-id": { type: "string" },
+        "selections-file": { type: "string" },
+        "selections-json": { type: "string" },
+      });
+      const config = await loadCommandConfig(values);
+      await commandApplyDesignSystem(values, config);
       return;
     }
     case "download-html":

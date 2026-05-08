@@ -1,11 +1,13 @@
 ---
 name: stitch
-description: Request Google Stitch through the bundled SDK runner or by writing @google/stitch-sdk code. Trigger when creating or listing Stitch projects, generating screens, editing screens, generating variants, downloading HTML or images, configuring STITCH_API_KEY or OAuth parameters, or converting Stitch output into React, Vue, or other app code.
+description: Request Google Stitch through the bundled SDK runner or by writing @google/stitch-sdk code. Trigger when creating or listing Stitch projects, generating screens, editing screens, generating variants, building or applying design systems, downloading HTML or images, exposing Stitch tools to the Vercel AI SDK or Google ADK, configuring STITCH_API_KEY or OAuth parameters, or converting Stitch output into React, Vue, or other app code.
 ---
 
 # Stitch
 
-Use this skill when the task needs to actually talk to the Stitch service. Prefer the bundled runner in `scripts/run.sh` over ad-hoc one-off code when the request is operational: listing projects, generating screens, editing, variants, or exports.
+Use this skill when the task needs to actually talk to the Stitch service. Prefer the bundled runner in `scripts/run.sh` over ad-hoc one-off code when the request is operational: listing projects, generating screens, editing, variants, design systems, or exports.
+
+The runner wraps the official `@google/stitch-sdk` (v0.1.1+) and exposes the same surface as the documented Stitch SDK at `stitch.withgoogle.com/docs`.
 
 ## Workflow
 
@@ -17,7 +19,8 @@ Use this skill when the task needs to actually talk to the Stitch service. Prefe
 
 2. Resolve authentication.
    - Prefer `STITCH_API_KEY` for local scripted use.
-   - OAuth is supported through `STITCH_ACCESS_TOKEN` plus `GOOGLE_CLOUD_PROJECT`.
+   - OAuth is supported through `STITCH_ACCESS_TOKEN` plus `GOOGLE_CLOUD_PROJECT`. The official SDK requires both together when not using `apiKey`.
+   - `STITCH_HOST` overrides the MCP server URL when the user is pointed at a non-default endpoint.
    - CLI flags override env vars, and env vars override config-file values.
 
 3. Choose the execution path.
@@ -29,22 +32,27 @@ Use this skill when the task needs to actually talk to the Stitch service. Prefe
      - `generate`
      - `edit`
      - `variants`
+     - `list-design-systems`
+     - `create-design-system`
+     - `update-design-system`
+     - `apply-design-system`
      - `download-html`
      - `download-image`
      - `list-tools`
      - `call-tool`
      - `save-config`
-   - Use handwritten TypeScript with `@google/stitch-sdk` only when the user wants checked-in code, automation inside an application, or a custom integration.
+   - Use handwritten TypeScript with `@google/stitch-sdk` only when the user wants checked-in code, automation inside an application, or a custom integration (e.g. agent toolset, MCP proxy).
 
 4. Bootstrap the SDK runtime through the wrapper.
    - Run `scripts/run.sh install-sdk` before first use, or let the first SDK-backed command auto-install the package.
    - The runner installs `@google/stitch-sdk` into a user cache directory by default, so it does not need to modify the repository.
-   - Override the runtime location with `--runtime-dir` or `STITCH_SKILL_RUNTIME_DIR` if needed.
+   - Override the runtime location with `--runtime-dir` or `STITCH_SKILL_RUNTIME_DIR` if needed, and pin a specific version with `--sdk-package`.
 
 5. Execute the Stitch operation with the smallest sufficient command.
    - Use `create-project` and `generate` for first-pass concepts.
    - Use `edit` for focused revisions.
    - Use `variants` for exploration.
+   - Use `create-design-system` plus `apply-design-system` to enforce one visual language across multiple screens.
    - Use `download-html` or `download-image` when the user needs local artifacts instead of URLs.
 
 ## Runner Usage
@@ -64,6 +72,7 @@ Common options:
 - `--base-url`
 - `--timeout-ms`
 - `--runtime-dir`
+- `--sdk-package`
 - `--json`
 - `--save-config`
 
@@ -76,14 +85,14 @@ Generation defaults can come from config, then be overridden per command:
 
 - `--device-type MOBILE|DESKTOP|TABLET|AGNOSTIC`
 - `--model-id GEMINI_3_PRO|GEMINI_3_FLASH`
-- `--variant-count`
+- `--variant-count` (1–5)
 - `--creative-range REFINE|EXPLORE|REIMAGINE`
-- `--aspects LAYOUT,COLOR_SCHEME,...`
+- `--aspects LAYOUT,COLOR_SCHEME,IMAGES,TEXT_FONT,TEXT_CONTENT`
 
 ## Command Patterns
 
 - List projects:
-- `scripts/run.sh list-projects --json`
+  - `scripts/run.sh list-projects --json`
 - Save parameters into `.stitch.json`:
   - `scripts/run.sh save-config --api-key "$STITCH_API_KEY" --project-id 123 --device-type DESKTOP --json`
 - Create a project:
@@ -95,6 +104,10 @@ Generation defaults can come from config, then be overridden per command:
   - `scripts/run.sh edit --project-id 123 --screen-id abc --prompt "Make the hero more compact" --json`
 - Generate variants:
   - `scripts/run.sh variants --project-id 123 --screen-id abc --prompt "Explore cleaner layouts" --variant-count 3 --creative-range EXPLORE --aspects LAYOUT,COLOR_SCHEME --json`
+- Create a design system:
+  - `scripts/run.sh create-design-system --project-id 123 --design-system-file ./design.json --json`
+- Apply a design system to selected screen instances:
+  - `scripts/run.sh apply-design-system --project-id 123 --asset-id 9 --selections-file ./selections.json --json`
 - Download HTML:
   - `scripts/run.sh download-html --project-id 123 --screen-id abc --out ./tmp/screen.html`
 
@@ -104,21 +117,34 @@ Use direct `@google/stitch-sdk` code when:
 
 - the user wants a committed script or service integration
 - the project already has a Node or Bun runtime
-- the request needs `stitchTools()` with the Vercel AI SDK
+- the request needs `stitchTools()` from `@google/stitch-sdk/ai` with the Vercel AI SDK
+- the request needs `stitchAdkTools()` from `@google/stitch-sdk/adk` with Google's Agent Development Kit
+- the user wants to expose Stitch tools through their own MCP server via `StitchProxy`
 - the agent must integrate Stitch operations into a larger app workflow
 
 When writing code, prefer the official object model:
 
-- `stitch.createProject(title)`
 - `stitch.projects()`
 - `stitch.project(id)`
+- `stitch.callTool("create_project", { title })` (canonical project creation)
 - `project.generate(prompt, deviceType?, modelId?)`
 - `project.screens()`
 - `project.getScreen(screenId)`
+- `project.createDesignSystem(designSystem)`
+- `project.listDesignSystems()`
+- `project.designSystem(id)`
 - `screen.edit(prompt, deviceType?, modelId?)`
 - `screen.variants(prompt, variantOptions, deviceType?, modelId?)`
 - `screen.getHtml()`
 - `screen.getImage()`
+- `designSystem.update(designSystem)`
+- `designSystem.apply(selectedScreenInstances)`
+
+For agent integrations:
+
+- `import { stitchTools } from "@google/stitch-sdk/ai"` — Vercel AI SDK tools
+- `import { stitchAdkTools } from "@google/stitch-sdk/adk"` — Google ADK FunctionTools
+- `import { StitchProxy } from "@google/stitch-sdk"` — MCP server proxy
 
 ## Safety Rules
 
@@ -128,12 +154,16 @@ When writing code, prefer the official object model:
 - Treat export URLs as transient download artifacts, not stable permanent URLs.
 - When converting Stitch output into another framework, state clearly whether the source is Stitch HTML or a Stitch image.
 - If first-run SDK installation needs network access and the environment blocks it, surface that blocker or request approval.
+- Catch `StitchError` in handwritten code and inspect `error.code` (`AUTH_FAILED`, `NOT_FOUND`, `PERMISSION_DENIED`, `RATE_LIMITED`, `NETWORK_ERROR`, `VALIDATION_ERROR`, `UNKNOWN_ERROR`) before retrying.
 
 ## Example Requests
 
 - "Use $stitch to create a Stitch project and generate a landing page."
 - "Use $stitch to list my Stitch projects."
 - "Use $stitch to generate three variants for this screen and save the HTML for the best one."
+- "Use $stitch to extract a design system from our brand and apply it across the existing screens."
+- "Use $stitch to expose Stitch tools to a Vercel AI SDK agent."
+- "Use $stitch to wire Stitch into a Google ADK TypeScript agent."
 - "Use $stitch to write a committed TypeScript helper around @google/stitch-sdk."
 - "Use $stitch to download the image for this Stitch screen."
 
@@ -143,6 +173,6 @@ When writing code, prefer the official object model:
 - `scripts/stitch.mjs`: SDK-backed Stitch runner with config support.
 - `assets/stitch.example.json`: example config file.
 - `references/config.md`: config lookup order and schema.
-- `references/mcp-sdk.md`: SDK methods, auth fields, and low-level tool usage.
+- `references/mcp-sdk.md`: SDK methods, ADK and AI-SDK exports, auth fields, error codes, and low-level tool usage.
 - `references/prompting.md`: prompt-writing guidance for generation and edits.
 - `references/design-md.md`: DESIGN.md guidance when the user wants consistent multi-screen design systems.
