@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Reusable coding-agent skills from itamaker",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "plugins": [
     {
@@ -22,6 +22,14 @@
       "source": {
         "source": "github",
         "repo": "itamaker/stitch-skills"
+      }
+    },
+    {
+      "name": "webpage-to-pdf-skill",
+      "description": "Export live webpages to pixel-perfect paginated PDFs via headless Chrome screenshots",
+      "source": {
+        "source": "github",
+        "repo": "itamaker/webpage-to-pdf-skill"
       }
     }
   ]
