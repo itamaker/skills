@@ -3,6 +3,15 @@
   "notGrouped": "bottom",
   "groupings": [
     {
+      "title": "Web",
+      "description": "Web pages and web-based design tools.",
+      "skills": [
+        "remote-browser",
+        "webpage-to-pdf",
+        "stitch"
+      ]
+    },
+    {
       "title": "Agent Tooling",
       "description": "Build and evaluate LLM agents.",
       "skills": [
@@ -11,15 +20,6 @@
         "ragcheck",
         "promptdeck",
         "datasetlint"
-      ]
-    },
-    {
-      "title": "Web",
-      "description": "Web pages and web-based design tools.",
-      "skills": [
-        "webpage-to-pdf",
-        "stitch",
-        "remote-browser"
       ]
     },
     {
