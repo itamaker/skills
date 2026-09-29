@@ -92,6 +92,16 @@ for (const bucket of [...PROMOTED, ...OTHER]) {
 for (const path of pluginSkills)
   if (!existsSync(join(ROOT, path, "SKILL.md"))) fail(`.claude-plugin/plugin.json: ${path} has no SKILL.md`);
 
+// skills.sh.json groups the promoted skills for the skills.sh repo page: one group per bucket.
+const groupsJson = JSON.parse(read("skills.sh.json"));
+const grouped = new Map();
+for (const g of groupsJson.groupings) for (const n of g.skills) grouped.set(n, (grouped.get(n) ?? 0) + 1);
+for (const bucket of PROMOTED)
+  for (const name of dirs(`skills/${bucket}`))
+    if (grouped.get(name) !== 1) fail(`skills.sh.json: ${name} must be listed in exactly one group (found ${grouped.get(name) ?? 0})`);
+for (const name of grouped.keys())
+  if (!seen.has(name)) fail(`skills.sh.json: lists ${name}, which has no folder`);
+
 if (errors.length) {
   console.error(errors.map((e) => `error: ${e}`).join("\n"));
   process.exit(1);

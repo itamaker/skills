@@ -18,3 +18,5 @@ Every `SKILL.md` has an `agents/openai.yaml` beside it. Install commands are cop
 Five skills wrap a Go command-line tool (skillforge, runlens, ragcheck, promptdeck, datasetlint). The tool's source, release config and Homebrew formula stay in its own repository (`itamaker/<name>-skill`); only the skill folder lives here. Do not copy tool source into this repo.
 
 To link every skill outside `deprecated/` and `misc/` into the local harness directories (`~/.claude/skills`, `~/.agents/skills`), run `scripts/link-skills.sh`. Each entry is a symlink into this repo, so a `git pull` keeps installed skills current.
+
+`skills.sh.json` at the repo root groups the promoted skills (one group per bucket) on the skills.sh repo page. Add a new promoted skill to its bucket's group; `scripts/check-skills.mjs` fails otherwise. The file only changes how skills.sh displays the repo, and skills.sh picks up changes after the next install with telemetry enabled.
