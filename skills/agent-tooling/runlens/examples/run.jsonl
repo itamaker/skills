@@ -1,0 +1,6 @@
+{"timestamp":"2026-03-11T08:00:00Z","agent":"planner","tool":"web-search","latency_ms":90,"tokens_in":180,"tokens_out":40,"success":true}
+{"timestamp":"2026-03-11T08:00:01Z","agent":"planner","tool":"retriever","latency_ms":120,"tokens_in":220,"tokens_out":60,"success":true}
+{"timestamp":"2026-03-11T08:00:02Z","agent":"writer","tool":"retriever","latency_ms":160,"tokens_in":260,"tokens_out":55,"success":true}
+{"timestamp":"2026-03-11T08:00:03Z","agent":"writer","tool":"code-exec","latency_ms":310,"tokens_in":320,"tokens_out":80,"success":false,"error":"timeout"}
+{"timestamp":"2026-03-11T08:00:04Z","agent":"reviewer","tool":"web-search","latency_ms":110,"tokens_in":200,"tokens_out":45,"success":true}
+

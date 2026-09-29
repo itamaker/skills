@@ -1,2 +1,5 @@
+node_modules
+.claude
+__pycache__
+*.egg-info
 .DS_Store
-__pycache__/

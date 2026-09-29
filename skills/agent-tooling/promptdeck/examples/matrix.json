@@ -1,0 +1,8 @@
+{
+  "artifact": ["agent runbook", "evaluation report"],
+  "audience": ["researchers", "infra engineers"],
+  "tone": ["direct", "skeptical"],
+  "depth": ["medium"],
+  "risk": ["low", "medium"]
+}
+

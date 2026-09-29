@@ -1,0 +1,3 @@
+interface:
+  display_name: "promptdeck"
+  short_description: "Render, batch and rank prompt variants"

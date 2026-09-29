@@ -1,0 +1,3 @@
+interface:
+  display_name: "Remote Browser"
+  short_description: "Cloud browser on your own Cloudflare account"
