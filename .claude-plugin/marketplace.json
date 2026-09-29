@@ -1,76 +1,23 @@
 {
-  "name": "itamaker-skills",
+  "name": "itamaker",
   "owner": {
-    "name": "Jonny"
+    "name": "Zhaoyang Jia",
+    "url": "https://github.com/itamaker"
   },
-  "metadata": {
-    "description": "Reusable coding-agent skills from itamaker",
-    "version": "0.4.0"
-  },
+  "description": "Zhaoyang Jia's agent skills, as an installable Claude Code plugin.",
   "plugins": [
     {
-      "name": "go-workspace-skill",
-      "description": "Manage configurable multi-repo Go workspaces",
-      "source": {
-        "source": "github",
-        "repo": "itamaker/go-workspace-skill"
-      }
-    },
-    {
-      "name": "stitch-skill",
-      "description": "Google Stitch workflows with an SDK-backed runner",
-      "source": {
-        "source": "github",
-        "repo": "itamaker/stitch-skill"
-      }
-    },
-    {
-      "name": "webpage-to-pdf-skill",
-      "description": "Export live webpages to pixel-perfect paginated PDFs via headless Chrome screenshots",
-      "source": {
-        "source": "github",
-        "repo": "itamaker/webpage-to-pdf-skill"
-      }
-    },
-    {
-      "name": "forge-skill",
-      "description": "Draft and scaffold OpenClaw-ready agent skills with skillforge",
-      "source": {
-        "source": "github",
-        "repo": "itamaker/forge-skill"
-      }
-    },
-    {
-      "name": "runlens-skill",
-      "description": "Analyze agent and tool JSONL traces for failures, flaky paths, latency outliers, and token usage",
-      "source": {
-        "source": "github",
-        "repo": "itamaker/runlens-skill"
-      }
-    },
-    {
-      "name": "ragcheck-skill",
-      "description": "Evaluate retrieval and RAG runs offline with Precision@k, Recall@k, MAP, nDCG, and an answer judge",
-      "source": {
-        "source": "github",
-        "repo": "itamaker/ragcheck-skill"
-      }
-    },
-    {
-      "name": "promptdeck-skill",
-      "description": "Render, batch, and optimize prompt templates from JSON variables and experiment matrices",
-      "source": {
-        "source": "github",
-        "repo": "itamaker/promptdeck-skill"
-      }
-    },
-    {
-      "name": "datasetlint-skill",
-      "description": "Audit JSONL datasets for duplicates, semantic leakage, and label conflicts",
-      "source": {
-        "source": "github",
-        "repo": "itamaker/datasetlint-skill"
-      }
+      "name": "itamaker-skills",
+      "source": "./",
+      "description": "Agent tooling and evaluation, web page export and design tools, and Go workspace management.",
+      "category": "development",
+      "keywords": [
+        "agent-skills",
+        "llm",
+        "evaluation",
+        "pdf",
+        "go"
+      ]
     }
   ]
 }

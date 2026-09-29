@@ -1,0 +1,3 @@
+interface:
+  display_name: "ragcheck"
+  short_description: "Evaluate retrieval and RAG runs offline"

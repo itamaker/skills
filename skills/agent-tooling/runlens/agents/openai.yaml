@@ -1,0 +1,3 @@
+interface:
+  display_name: "runlens"
+  short_description: "Analyze agent and tool JSONL traces"

@@ -1,0 +1,3 @@
+interface:
+  display_name: "datasetlint"
+  short_description: "Audit JSONL datasets for quality and leakage"

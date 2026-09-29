@@ -1,0 +1,3 @@
+interface:
+  display_name: "Webpage to PDF"
+  short_description: "Export a live webpage as a pixel-perfect PDF"
