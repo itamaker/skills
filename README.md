@@ -50,6 +50,7 @@ The same `npx skills` installer writes the skills into your repo as ordinary fil
 |---|---|
 | skillforge, runlens, ragcheck, promptdeck, datasetlint | Their CLI: `brew install itamaker/tap/<name>`, or a release binary from the tool's own repository |
 | webpage-to-pdf | Google Chrome and Python 3 (the converter ships inside the skill) |
+| remote-browser | Node.js 18+, npm, curl and a Cloudflare account; the skill deploys its own Worker for you |
 | stitch | Node.js (or Bun) and Stitch credentials: `STITCH_API_KEY`, or OAuth via `STITCH_ACCESS_TOKEN` plus `GOOGLE_CLOUD_PROJECT`. The SDK runner installs itself on first use |
 | go-workspace-skill | Python 3, Git and Go, plus a workspace config file (the skill can create one) |
 
@@ -73,6 +74,7 @@ Work with web pages and web-based design tools.
 
 - **[webpage-to-pdf](./skills/web/webpage-to-pdf/SKILL.md)**: Export a live webpage as a pixel-perfect, paginated PDF via headless Chrome screenshots.
 - **[stitch](./skills/web/stitch/SKILL.md)**: Generate and edit designs with Google Stitch through a bundled SDK runner, and turn the output into app code.
+- **[remote-browser](./skills/web/remote-browser/SKILL.md)**: Give Claude a cloud browser on your own Cloudflare account: read JavaScript-heavy pages and hand you a live session for manual logins.
 
 ### Dev
 

@@ -1,7 +1,7 @@
 Skills are organized into bucket folders under `skills/`:
 
 - `agent-tooling/`: building and evaluating LLM agents (skillforge, runlens, ragcheck, promptdeck, datasetlint)
-- `web/`: web pages and web-based design tools (webpage-to-pdf, stitch)
+- `web/`: web pages and web-based design tools (webpage-to-pdf, stitch, remote-browser)
 - `dev/`: everyday development workflow (go-workspace-skill)
 - `in-progress/`: beta: public on purpose, feedback wanted, not shipped in the plugin
 - `misc/`: kept around but rarely used, not promoted

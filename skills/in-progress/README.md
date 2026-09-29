@@ -8,4 +8,4 @@ The plugin does not include these. Install one directly:
 npx skills@latest add itamaker/skills --skill=<name>
 ```
 
-- **[remote-browser](./remote-browser/SKILL.md)**: Give Claude a cloud browser on your own Cloudflare account: read JavaScript-heavy pages and hand you a live session for manual logins.
+Nothing here right now.
