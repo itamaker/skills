@@ -1,5 +1,7 @@
 # itamaker/skills
 
+[![skills.sh](https://skills.sh/b/itamaker/skills)](https://skills.sh/itamaker/skills)
+
 Agent skills by [Zhaoyang Jia](https://github.com/itamaker): tooling for building and evaluating LLM agents, web page export, and Go workspace management. Each skill is a small folder with a `SKILL.md`. They work with Claude Code, Codex and other agents that read skills.
 
 > These skills used to live in separate repositories (`stitch-skill`, `forge-skill`, `runlens-skill` and so on). They now live here; the old repositories point back to this one.
