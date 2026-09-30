@@ -39,7 +39,7 @@ Run `scripts/instances.sh list` and show its tree (per instance: URL, whether th
 
 ## Delete
 
-Irreversible: the Worker is removed from Cloudflare and its token from this machine. Run `instances.sh list`, confirm the exact name with AskUserQuestion, and only then run `instances.sh delete <name>`. Report the result.
+Irreversible: the Worker is removed from Cloudflare and its token from this machine. Run `instances.sh list`, confirm the exact name with AskUserQuestion, and only then run `instances.sh delete <name>`. Report the result. If it fails on authentication, do the [Cloudflare login](#2-cloudflare-login) step first; with several accounts, put `CLOUDFLARE_ACCOUNT_ID=<id>` in front of the command.
 
 ## Setup
 
@@ -47,10 +47,10 @@ Irreversible: the Worker is removed from Cloudflare and its token from this mach
 
 Run `scripts/check-env.sh` before asking anything. Exit 0 → continue.
 
-Otherwise it lists what's missing (Node.js 18+, npm, curl) and prints `INSTALL_CMD` when it recognises the package manager. Ask the user with AskUserQuestion whether to install, showing the exact command:
+Otherwise it lists what's missing (Node.js 22.18+ built with TypeScript support, npm, curl) and prints `INSTALL_CMD` when it has one: a package-manager command for a missing `curl`, or `scripts/install-node.sh` for a Node.js problem. The script downloads an official Node.js 22 (about 30 MB, checksum-verified) into `~/.local/share/remote-browser/.node`, needs no `sudo` and changes nothing else; the other scripts then use it automatically. `cf` itself is not checked or installed up front: `npx --yes` fetches it for the login step and `npm install` puts a pinned copy in the Worker's folder. Ask the user with AskUserQuestion whether to install, showing the exact command:
 
-- **Yes**: commands that need `sudo` can't take a password here, so have the user run it with `! <INSTALL_CMD>`; commands that don't (e.g. `brew`) you may run. Distro packages can be older than Node 18: rerun the check afterwards and, if still `too_old`, say so and point to nodejs.org or nvm.
-- **No**, or `INSTALL_CMD` is empty: stop and tell them what to install manually, then rerun the check.
+- **Yes**: commands that need `sudo` can't take a password here, so have the user run it with `! <INSTALL_CMD>`; commands that don't (`install-node.sh`, `brew`) you may run. Then rerun the check.
+- **No**, or `INSTALL_CMD` is empty: stop and tell them what to install manually (for Node.js, a build from nodejs.org or nvm), then rerun the check.
 
 **Done when:** `check-env.sh` exits 0.
 
@@ -69,7 +69,7 @@ Tell them before deploying: Browser Run's free plan gives 10 browser-minutes a d
 
 ### 2. Cloudflare login
 
-Run `npx --yes wrangler@4 whoami` (`--yes` skips the npx download prompt; wrangler isn't installed yet at this point). If it doesn't say "You are logged in", have the user run `! npx --yes wrangler@4 login` (browser OAuth, only they can complete it), then re-check.
+Run `npx --yes cf@latest auth whoami` (`--yes` skips the npx download prompt; `cf` isn't installed yet at this point). It exits 0 either way: if the JSON says `"authenticated": false`, have the user run `! npx --yes cf@latest auth login` (browser OAuth, only they can complete it; add `--no-browser` on a remote machine), then re-check. `cf` keeps its own credentials and doesn't reuse a Wrangler login, so someone who used Wrangler before still signs in once. If `accounts` lists more than one, ask which to use and put `CLOUDFLARE_ACCOUNT_ID=<id>` in front of the deploy command: without a terminal `cf` can't ask.
 
 ### 3. Deploy
 
@@ -77,7 +77,7 @@ Run `npx --yes wrangler@4 whoami` (`--yes` skips the npx download prompt; wrangl
 WORKER_TOKEN='<token>' scripts/deploy.sh <name>
 ```
 
-Add `FORCE=1` only to update an existing deployment. Exit codes: `2` not logged in (step 2 again), `3` name taken in the Cloudflare account (ask for another), `4` bad input (fix and rerun). The script installs dependencies, typechecks, uploads the secret, deploys, and records the instance; its last line is `WORKER_URL=<url>`.
+Add `FORCE=1` only to update an existing deployment. Exit codes: `2` not logged in (step 2 again), `3` name taken in the Cloudflare account (ask for another), `4` bad input (fix and rerun). The script installs dependencies, generates types and typechecks, deploys with the token as a secret, and records the instance; its last line is `WORKER_URL=<url>`.
 
 ### 4. Verify and report
 
@@ -85,7 +85,7 @@ Smoke-test with `/fetch?url=https://example.com` (see [Use](#use)); expect HTTP 
 
 - **HTTP 429** (`Browser Run rate limit or daily quota reached`): the deployment is fine; the account's Browser Run quota is used up (free plan: 10 browser-minutes per day, 3 concurrent browsers, one new browser per 10 seconds). Tell the user this explicitly, include the estimated recovery time from the response, and mention that Workers Paid removes the daily cap. Wait about 15 seconds and retry once to rule out the per-10-seconds limit; if it persists, report the deployment as successful but unverified.
 - **HTTP 401**: the token sent doesn't match the saved one; recheck the instance's `token` file.
-- **Other 5xx**: retry once, then read `wrangler tail` output for the real error.
+- **Other 5xx**: retry once, then read the error text in the response body (`details`, or `error` on `/status`).
 
 **Done when:** the smoke test passes, or fails only with the 429 quota case above. Report as a tree, for example:
 

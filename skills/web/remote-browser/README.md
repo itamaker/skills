@@ -41,10 +41,10 @@ remote-browser-test
 
 ## What `deploy` does
 
-1. Checks Node.js 18+, npm and curl, and offers an install command if one is missing.
+1. Checks Node.js 22.18+ (built with TypeScript support), npm and curl, and offers to install what is missing. For Node.js that is an official build kept in the skill's own folder, with no `sudo`.
 2. Asks for a Worker name (lowercase letters, digits, dashes) and an API token. The default is a generated random token.
-3. Makes sure you are signed in to Cloudflare, and has you run `wrangler login` if not.
-4. Installs dependencies, typechecks the Worker, uploads the token as a secret, and deploys.
+3. Makes sure you are signed in to Cloudflare, and has you run `cf auth login` if not.
+4. Installs dependencies, generates types and typechecks the Worker, and deploys it with the token as a secret.
 5. Records the deployment locally and smoke-tests it.
 6. Reports the address, the token file and the test result.
 
@@ -71,6 +71,8 @@ A live-view link gives full control of that browser, so treat it like a password
 ├── README.md                             this file
 ├── scripts/
 │   ├── check-env.sh                      environment check
+│   ├── install-node.sh                   install an official Node.js for the skill (no sudo)
+│   ├── node-path.sh                      makes the other scripts prefer that Node.js
 │   ├── deploy.sh                         deploy and record an instance
 │   └── instances.sh                      list / status / delete
 └── template/                             the Worker source that gets deployed
@@ -80,13 +82,16 @@ A live-view link gives full control of that browser, so treat it like a password
 └── token                                 API token (mode 600)
 
 ~/.local/share/remote-browser/<name>/          copy of the source that was deployed
+~/.local/share/remote-browser/.node/           Node.js from install-node.sh, if it was needed
 ```
 
 To change the Worker, edit `template/` and run `/remote-browser deploy <name>`; it updates in place. To rotate a token, redeploy the same name and choose a new one.
 
 ## Good to know
 
-- **Cloudflare**: each deployment is a Cloudflare Worker using Browser Run (formerly Browser Rendering) for the browser, `@cloudflare/puppeteer` to drive it, and a Worker secret for the token. Deploy, login and delete go through the Wrangler CLI.
+- **Cloudflare**: each deployment is a Cloudflare Worker using Browser Run (formerly Browser Rendering) for the browser, `@cloudflare/puppeteer` to drive it, and a Worker secret for the token. Deploy, login and delete go through the Cloudflare CLI, [`cf`](https://developers.cloudflare.com/cf/). `cf` and the Cloudflare Vite plugin it builds with are both in beta, so the Worker pins their versions. You don't install `cf` yourself: `npx` fetches it for the login step and each deployment installs its pinned copy.
+- **Platforms**: Linux and macOS on x64 and arm64. The scripts are plain bash (macOS's own 3.2 is enough) and use only curl and the standard tools. The Node.js installer needs glibc on Linux, so on Alpine or other CPUs install Node.js 22.18+ yourself. Windows works through WSL.
+- **Your own terminal**: the scripts find the skill's Node.js by themselves. To run `cf` yourself outside them, put `~/.local/share/remote-browser/.node/bin` first on your `PATH`, or link its `node` into a folder that already is (for example `ln -s ~/.local/share/remote-browser/.node/bin/node ~/.local/bin/node`).
 - **Quota**: browser time is limited per Cloudflare account. The free plan allows 10 minutes a day (resets 00:00 UTC), one new browser per 10 seconds and 3 at a time. Past that, every endpoint answers HTTP 429 with an estimated recovery time. A paid Cloudflare plan is recommended for regular use; see Cloudflare's pricing page for details.
 - **Blocked sites**: heavily defended sites, Google in particular, refuse Cloudflare's datacenter addresses. Use a search API instead of scraping results.
 - **Region**: the browser's country can't be chosen; it depends on Cloudflare's routing.
@@ -99,5 +104,7 @@ To change the Worker, edit `template/` and run `/remote-browser deploy <name>`; 
 | HTTP 429 with a recovery time | Browser quota spent; wait for the reset |
 | HTTP 401 | Token differs from the deployed one; check the instance's `token` file |
 | `status` says the Worker predates `/status` | Older deployment; run `/remote-browser deploy <name>` |
-| `deploy` says not logged in | Run `npx --yes wrangler@4 login` and retry |
+| `deploy` says not logged in | Run `npx --yes cf@latest auth login` and retry; `cf` does not reuse a Wrangler login |
+| `deploy` says more than one account is available | Put `CLOUDFLARE_ACCOUNT_ID=<id>` in front of the command and retry |
 | `deploy` says the name already exists | Pick another name, or update that one |
+| `check-env.sh` reports `node=no_typescript` or `too_old` | `cf` needs Node.js 22.18+ built with TypeScript support, which Debian/Ubuntu's `nodejs` package is not. Run `scripts/install-node.sh` (or accept it when `/remote-browser deploy` offers it); `NODE_DIST_MIRROR` points it at a regional mirror. To undo: `rm -rf ~/.local/share/remote-browser/.node` |
