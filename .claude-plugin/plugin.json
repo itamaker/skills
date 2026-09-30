@@ -1,6 +1,6 @@
 {
   "name": "itamaker-skills",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Zhaoyang Jia's agent skills: LLM agent tooling and evaluation, web page export, a cloud browser and design tools, and Go workspace management.",
   "author": {
     "name": "Zhaoyang Jia",
