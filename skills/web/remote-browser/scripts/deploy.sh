@@ -9,6 +9,7 @@ set -euo pipefail
 NAME="${1:-}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/remote-browser"
+source "$SKILL_DIR/scripts/node-path.sh"
 
 if [[ ! "$NAME" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]]; then
   echo "Invalid worker name '$NAME': use lowercase letters, digits and dashes (max 63 chars)." >&2
@@ -23,20 +24,25 @@ if [[ ${#WORKER_TOKEN} -lt 16 ]]; then
   exit 4
 fi
 
-NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-if (( NODE_MAJOR < 18 )); then
-  echo "Node.js 18 or newer is required (found major version $NODE_MAJOR)." >&2
+# cf loads cloudflare.config.ts with Node's built-in TypeScript support: it needs Node 22.18+ built with
+# it. node-path.sh puts the Node from install-node.sh first on PATH; check-env.sh says what is missing.
+if ! node_fits_cf; then
+  echo "Node.js 22.18 or newer with TypeScript support is required (found $(node --version 2>/dev/null || echo none)). Run scripts/check-env.sh." >&2
   exit 4
 fi
 
 TARGET="${2:-$HOME/.local/share/remote-browser/$NAME}"
 mkdir -p "$TARGET"
 cp -R "$SKILL_DIR/template/." "$TARGET/"
-sed -i "s/__WORKER_NAME__/$NAME/g" "$TARGET/wrangler.jsonc" "$TARGET/package.json"
+# Leftovers from deployments made with the Wrangler-based version of this skill.
+rm -f "$TARGET/wrangler.jsonc" "$TARGET/worker-configuration.d.ts" "$TARGET/src/env.d.ts"
+# -i.bak is the form both GNU and BSD (macOS) sed accept.
+sed -i.bak "s/__WORKER_NAME__/$NAME/g" "$TARGET/cloudflare.config.ts" "$TARGET/package.json"
+rm -f "$TARGET/cloudflare.config.ts.bak" "$TARGET/package.json.bak"
 cd "$TARGET"
 
 npm install --no-audit --no-fund
-npx wrangler types
+npx cf workers types
 npx tsc --noEmit
 
 if [[ "${DRY_RUN:-}" == "1" ]]; then
@@ -44,18 +50,32 @@ if [[ "${DRY_RUN:-}" == "1" ]]; then
   exit 0
 fi
 
-if ! npx wrangler whoami 2>&1 | grep -q "You are logged in"; then
-  echo "Not logged in to Cloudflare. Run: npx --yes wrangler@4 login" >&2
+# whoami exits 0 even when signed out; it prints {"authenticated": false, ...} instead.
+if ! npx cf auth whoami 2>/dev/null | node -e '
+  let d = "";
+  process.stdin.on("data", c => d += c).on("end", () => {
+    let ok = false;
+    try { const s = JSON.parse(d); ok = s.authenticated === true && s.tokenValid !== false; } catch {}
+    process.exit(ok ? 0 : 1);
+  });'; then
+  echo "Not logged in to Cloudflare. Run: npx --yes cf@latest auth login" >&2
   exit 2
 fi
 
-if npx wrangler deployments list --name "$NAME" >/dev/null 2>&1 && [[ "${FORCE:-}" != "1" ]]; then
+if npx cf workers get "$NAME" >/dev/null 2>&1 && [[ "${FORCE:-}" != "1" ]]; then
   echo "A Worker named '$NAME' already exists in this account. Pick another name, or set FORCE=1 to overwrite it." >&2
   exit 3
 fi
 
-printf '%s' "$WORKER_TOKEN" | npx wrangler secret put API_TOKEN
-DEPLOY_OUT="$(npx wrangler deploy 2>&1)"
+# A secret can only be set on a Worker that exists, and this may be its first deploy, so the token goes up
+# with the version (--secrets-file) from a private temp file.
+SECRETS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/remote-browser.XXXXXX")"
+trap 'rm -rf "$SECRETS_DIR"' EXIT
+OLD_UMASK="$(umask)"
+umask 077
+WORKER_TOKEN="$WORKER_TOKEN" node -e 'process.stdout.write(JSON.stringify({ API_TOKEN: process.env.WORKER_TOKEN }))' > "$SECRETS_DIR/secrets.json"
+umask "$OLD_UMASK"
+DEPLOY_OUT="$(npx cf deploy --secrets-file "$SECRETS_DIR/secrets.json" 2>&1)" || { echo "$DEPLOY_OUT" >&2; exit 1; }
 echo "$DEPLOY_OUT"
 
 URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\.workers\.dev' <<<"$DEPLOY_OUT" | head -1 || true)"

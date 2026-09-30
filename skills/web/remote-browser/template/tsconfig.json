@@ -4,12 +4,12 @@
     "lib": ["es2022"],
     "module": "es2022",
     "moduleResolution": "bundler",
-    "types": ["./worker-configuration.d.ts"],
+    "types": [],
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
     "isolatedModules": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "worker-configuration.d.ts"]
+  "include": ["src/**/*.ts", "cloudflare.config.ts", ".cloudflare/types"]
 }

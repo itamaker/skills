@@ -11,6 +11,7 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/remote-browser"
 REGISTRY="$CONFIG_DIR/instances"
 CMD="${1:-}"
 NAME="${2:-}"
+source "$(dirname "${BASH_SOURCE[0]}")/node-path.sh"
 
 field() { node -p "require('$REGISTRY/$1/config.json').$2"; }
 
@@ -91,10 +92,16 @@ case "$CMD" in
   delete)
     require_instance
     dir="$(field "$NAME" dir)"
-    if [[ -d "$dir" ]]; then
-      (cd "$dir" && npx --yes wrangler@4 delete --name "$NAME" --force) >&2
-    else
-      npx --yes wrangler@4 delete --name "$NAME" --force >&2
+    # --force is required: without it a non-interactive cf prints "Aborted." and exits 0 without deleting.
+    # Run from an empty scratch directory: cf reads the nearest cloudflare.config.ts (the deploy copy's needs
+    # Node with TypeScript support, and an unrelated one could pick the account) and caches the account it
+    # selects in the current directory.
+    scratch="$(mktemp -d "${TMPDIR:-/tmp}/remote-browser.XXXXXX")"
+    trap 'rm -rf "$scratch"' EXIT
+    # An explicit check rather than set -e: bash 3.2 (macOS) does not exit when a subshell fails.
+    if ! (cd "$scratch" && npx --yes cf@latest workers delete "$NAME" --force) >&2; then
+      echo "Could not delete '$NAME' from Cloudflare; the local record was kept." >&2
+      exit 1
     fi
     rm -rf "$REGISTRY/$NAME"
     copy="kept (not under ~/.local/share/remote-browser)"
