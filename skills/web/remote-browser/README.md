@@ -18,11 +18,11 @@ You can also open the Worker's address in a browser for a small web UI: paste th
 
 Here a remote browser is open on `ipwho.is`, which reports a Cloudflare address:
 
-![The web UI with a remote browser open on ipwho.is](./web-ui-live-view.png)
+![The web UI with a remote browser open on ipwho.is](./assets/web-ui-live-view.png)
 
 The same session on `muse.ai`, which shows a sign-in page where you log in by hand:
 
-![The web UI with the remote browser on the muse.ai sign-in page](./web-ui-manual-login.png)
+![The web UI with the remote browser on the muse.ai sign-in page](./assets/web-ui-manual-login.png)
 
 ## Commands
 
