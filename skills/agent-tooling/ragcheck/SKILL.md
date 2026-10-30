@@ -11,7 +11,7 @@ Offline and deterministic: no network, no model calls. Inputs are JSON arrays (n
 
 `brew install itamaker/tap/ragcheck`, a release binary from github.com/itamaker/ragcheck-skill, or `go build -o ragcheck .` in a clone of that repo.
 
-Bare `ragcheck` opens an interactive TUI that hangs an agent shell; always pass a subcommand. There is no `-h` or `--version`: run `ragcheck x` (invalid subcommand) for usage, `ragcheck score -h` for flags.
+Bare `ragcheck` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Usage: run `ragcheck x` (an invalid subcommand). Flags: `ragcheck score -h`. Both exit 2, which is expected; the CLI has no `--version`.
 
 ## Run
 
@@ -44,6 +44,6 @@ Compare retriever configs by running `score` once per `-run` file with the same 
 - `score` treats unjudged docs as non-relevant, so a new retriever's valid hits missing from qrels lower its score.
 - `score` counts a doc ID repeated in `results` as a repeated hit, which can push Recall above 1; dedupe `results` first.
 - `-k` 0 or below prints all-zero metrics with `Queries: 0`; `grades` overrides `relevant` when both are set.
-- `judge` misses paraphrase (`slower` vs `slow`), negation, and numbers under 3 characters (`42` vs `24` ground to 1.0). Text without spaces (CJK) becomes one word per run, so scores are all or nothing. Use human or LLM grading for correctness.
+- `judge` misses inflections (`slower` vs `slow`), paraphrase, negation, and numbers under 3 characters (`42` vs `24` ground to 1.0). Text without spaces (CJK) becomes one word per run, so scores are all or nothing. Use human or LLM grading for correctness.
 
 Exit 0 ok, 1 unreadable or invalid JSON, 2 usage error.

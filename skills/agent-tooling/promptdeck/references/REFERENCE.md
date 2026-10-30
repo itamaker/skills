@@ -4,7 +4,7 @@ Verified against the `render`, `matrix`, and `optimize` subcommands in `internal
 
 ## Global behavior
 
-- `promptdeck` with no arguments launches the TUI (see SKILL.md step 5).
+- `promptdeck` with no arguments launches an interactive TUI that hangs a non-interactive shell.
 - `promptdeck <unknown>` prints `unknown subcommand "x"` to stderr, a usage block to stdout, and exits `2`.
 - There is no top-level `-h`/`--help` flag; passing one is treated as an unknown subcommand (exit `2`). `promptdeck render -h` (also `matrix -h`, `optimize -h`) prints that subcommand's flags and exits `2`.
 - There is no `version` subcommand.

@@ -11,7 +11,7 @@ Deterministic stats over a JSONL trace (one event per line: `tool`, `latency_ms`
 
 `brew install itamaker/tap/runlens`, a release binary from github.com/itamaker/runlens-skill, or `go build -o runlens .` in a clone of that repo.
 
-Bare `runlens` opens an interactive TUI that hangs an agent shell; always pass a subcommand. There is no `-h` or `--version`: run `runlens x` (invalid subcommand) for usage, `runlens summary -h` for flags.
+Bare `runlens` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Usage: run `runlens x` (an invalid subcommand). Flags: `runlens summary -h`. Both exit 2, which is expected; the CLI has no `--version`.
 
 ## Run
 
@@ -32,7 +32,7 @@ Start with `diagnose`. `examples/run.jsonl` shows the event shape.
 
 ## Limits
 
-- Order is file order; `timestamp` and `agent` are ignored. Sort or split interleaved concurrent agents first, or transitions mix them.
+- Order is file order: `timestamp` is ignored and `agent` only labels outliers. Sort or split interleaved concurrent agents first, or transitions mix them.
 - A missing `success` field counts as a failure.
 - Small samples mislead: one failed call makes a tool 100% flaky. Latency outliers need at least 12 events (below that p95 is the max, so nothing exceeds it).
 - Outliers list only the 5 slowest, so fast failures drop out; use `Error clusters` for the failure inventory.

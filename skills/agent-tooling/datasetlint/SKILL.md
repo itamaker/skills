@@ -1,6 +1,6 @@
 ---
 name: datasetlint
-description: Audit train/eval JSONL datasets with the datasetlint CLI: duplicates, word-overlap near-duplicates, train/eval leakage, label conflicts, missing IDs, empty fields. Use when checking an eval set for leakage or gating CI on dataset issues.
+description: Audit train/eval JSONL datasets with the datasetlint CLI (duplicates, word-overlap near-duplicates, train/eval leakage, label conflicts, missing IDs, empty fields). Use when checking an eval set for leakage or gating CI on dataset issues.
 ---
 
 # datasetlint
@@ -11,7 +11,7 @@ Rows are JSON objects with string fields `id`, `input`, `output`, `label` (all o
 
 `brew install itamaker/tap/datasetlint`, a release binary from github.com/itamaker/datasetlint-skill, or `go build -o datasetlint .` in a clone of that repo.
 
-Bare `datasetlint` opens an interactive TUI that hangs an agent shell; always pass a subcommand. There is no `-h` or `--version`: run `datasetlint x` (invalid subcommand) for usage, `datasetlint scan -h` for flags.
+Bare `datasetlint` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Usage: run `datasetlint x` (an invalid subcommand). Flags: `datasetlint scan -h`. Both exit 2, which is expected; the CLI has no `--version`.
 
 ## Run
 
