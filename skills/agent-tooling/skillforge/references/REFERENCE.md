@@ -4,7 +4,7 @@ Verified against the `skillforge` source (`internal/app/` in github.com/itamaker
 
 ## Builds after v0.3.0
 
-v0.3.0 is the last release at the time of writing; the behaviour below is in `itamaker/forge-skill` branch `fix/init-valid-skill-output` and ships with the next release. Check `skillforge --version`: v0.3.0 and earlier reject it with exit 2.
+The behaviour below ships in the first skillforge release after v0.3.0 (itamaker/forge-skill#3). Check `skillforge --version`: v0.3.0 and earlier reject it with exit 2.
 
 - `init` writes `SKILL.md` starting with a `---` frontmatter block holding `name` (the slug, sanitised to `[a-z0-9]` plus single hyphens, at most 64 characters) and a one-line double-quoted `description` (capped at 300 characters; when it has no `Use when` clause, one is appended from the first one or two spec triggers).
 - `init` also writes `agents/openai.yaml` (`display_name`, `short_description`, `default_prompt`), rewrites `manifest.json` `slug` and the Metadata "Slug" line to the sanitised name, and prints a stderr warning (exit stays 0) when the `-out` folder name differs from the skill name.
