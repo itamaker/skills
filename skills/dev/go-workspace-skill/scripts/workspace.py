@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 CONFIG_ENV_VAR = "GO_WORKSPACE_SKILLS_CONFIG"
 DEFAULT_CONFIG_NAMES = (".go-workspace.json", "go-workspace.json")
@@ -66,9 +66,27 @@ def resolve_config_path(root: Path, explicit_config: str | None) -> Path:
     )
 
 
+def invalid_name_reason(name: str) -> str | None:
+    """Why `name` cannot be a direct child directory of the workspace root, or None if it can."""
+    if not name.strip():
+        return "is empty"
+    if name in (".", ".git"):
+        return "must not be '.' or '.git'"
+    if "/" in name or "\\" in name:
+        return "must not contain '/' or '\\'"
+    if ".." in name:
+        return "must not contain '..'"
+    if Path(name).is_absolute() or PureWindowsPath(name).is_absolute():
+        return "must not be an absolute path"
+    return None
+
+
 def load_repos(config_path: Path) -> list[Repo]:
-    data = json.loads(config_path.read_text())
-    raw_repos = data.get("repos")
+    try:
+        data = json.loads(config_path.read_text())
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"Invalid config: cannot read {config_path}: {exc}")
+    raw_repos = data.get("repos") if isinstance(data, dict) else None
     if not isinstance(raw_repos, list) or not raw_repos:
         raise SystemExit(f"Invalid config: {config_path} must define a non-empty repos list")
 
@@ -87,6 +105,9 @@ def load_repos(config_path: Path) -> list[Repo]:
             raise SystemExit(f"Invalid config: repo entry in {config_path} is missing a valid name")
         if not isinstance(url, str) or not url:
             raise SystemExit(f"Invalid config: repo '{name}' in {config_path} is missing a valid url")
+        reason = invalid_name_reason(name)
+        if reason:
+            raise SystemExit(f"Invalid config: repo name {name!r} in {config_path} {reason}")
         if name in seen:
             raise SystemExit(f"Invalid config: duplicate repo name '{name}' in {config_path}")
 
@@ -128,6 +149,11 @@ def parse_args() -> argparse.Namespace:
         "--force",
         action="store_true",
         help="Required for destructive clean operations.",
+    )
+    clean_parser.add_argument(
+        "--discard-changes",
+        action="store_true",
+        help="Also delete repos holding uncommitted work, unpushed commits or non-git directories.",
     )
 
     init_parser = subparsers.add_parser("init-config", help="Write an example workspace config.")
@@ -191,18 +217,76 @@ def format_names(names: list[str], output_format: str) -> str:
     return "\n".join(names)
 
 
-def run_command(cmd: list[str], *, cwd: Path | None = None, dry_run: bool) -> None:
+def say(message: str = "") -> None:
+    """Print and flush, so status lines stay ordered with child-process output on a pipe."""
+    print(message, flush=True)
+
+
+def run_command(cmd: list[str], *, cwd: Path | None = None, dry_run: bool) -> int:
+    """Run cmd with output streaming; return its exit code (127 if it cannot start)."""
     prefix = "[dry-run] " if dry_run else ""
     rendered = " ".join(shlex.quote(part) for part in cmd)
-    if cwd is not None:
-        print(f"{prefix}{rendered}  (cwd: {cwd})")
-    else:
-        print(f"{prefix}{rendered}")
+    say(f"{prefix}{rendered}" + (f"  (cwd: {cwd})" if cwd is not None else ""))
 
     if dry_run:
-        return
+        return 0
 
-    subprocess.run(cmd, cwd=str(cwd) if cwd else None, check=True)
+    try:
+        return subprocess.run(cmd, cwd=str(cwd) if cwd else None).returncode
+    except OSError as exc:
+        say(f"Cannot run {cmd[0]}: {exc}")
+        return 127
+
+
+def git_output(repo_dir: Path, *args: str) -> str:
+    """Stdout of a read-only git command in repo_dir; raises RuntimeError if git fails."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo_dir), *args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
+    except OSError as exc:
+        raise RuntimeError(f"cannot run git: {exc}")
+    if proc.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} failed: {proc.stderr.strip() or proc.returncode}")
+    return proc.stdout
+
+
+def git_succeeds(repo_dir: Path, *args: str) -> bool:
+    """True if a read-only git command exits 0 in repo_dir."""
+    quiet = subprocess.DEVNULL
+    return subprocess.run(["git", "-C", str(repo_dir), *args], stdout=quiet, stderr=quiet).returncode == 0
+
+
+def local_work_reasons(repo_dir: Path) -> list[str]:
+    """Reasons deleting repo_dir would lose work; empty means clean and fully pushed.
+
+    "Pushed" means reachable from a remote-tracking ref as of the last fetch; no fetch is done.
+    Fails closed: anything that cannot be verified is reported as a reason.
+    """
+    if repo_dir.is_symlink():
+        return ["is a symlink"]
+    if not (repo_dir / ".git").exists():
+        return ["is not a git repository"]
+    reasons: list[str] = []
+    try:
+        if git_output(repo_dir, "status", "--porcelain", "--untracked-files=all").strip():
+            reasons.append("uncommitted or untracked changes")
+        tips = ["--branches"]
+        if not git_succeeds(repo_dir, "symbolic-ref", "-q", "HEAD") and git_succeeds(
+            repo_dir, "rev-parse", "-q", "--verify", "HEAD"
+        ):
+            tips.append("HEAD")  # detached HEAD: its commits belong to no branch
+        unpushed = int(git_output(repo_dir, "rev-list", "--count", *tips, "--not", "--remotes").strip())
+        if unpushed:
+            reasons.append(f"{unpushed} commit(s) not on any remote branch")
+        if git_succeeds(repo_dir, "rev-parse", "-q", "--verify", "refs/stash"):
+            reasons.append("stashed changes")
+    except (RuntimeError, ValueError, OSError) as exc:
+        reasons.append(f"could not verify: {exc}")
+    return reasons
 
 
 def selected_repos(all_repos: list[Repo], requested: list[str]) -> list[Repo]:
@@ -217,62 +301,93 @@ def selected_repos(all_repos: list[Repo], requested: list[str]) -> list[Repo]:
     return [by_name[name] for name in requested]
 
 
-def remove_path(path: Path, *, dry_run: bool) -> None:
-    if not path.exists() and not path.is_symlink():
-        print(f"Skipping {path.name}: not found.")
-        return
-
-    print(f"Removing {path.name}")
+def remove_path(path: Path, *, dry_run: bool) -> bool:
+    """Delete path (a symlink is unlinked, never followed). Return False if deletion failed."""
+    say(f"{'[dry-run] ' if dry_run else ''}Removing {path.name}")
     if dry_run:
-        return
-
-    if path.is_symlink() or path.is_file():
-        path.unlink()
-        return
-
-    shutil.rmtree(path)
-
-
-def ensure_projects_exist(root: Path, projects: list[Repo]) -> None:
-    missing = [project.name for project in projects if not (root / project.name).is_dir()]
-    if missing:
-        raise SystemExit(
-            "Missing project directories: "
-            + ", ".join(missing)
-            + ". Run sync first or choose the correct --root."
-        )
+        return True
+    try:
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        else:
+            shutil.rmtree(path)
+    except OSError as exc:
+        say(f"FAILED to remove {path.name}: {exc}")
+        return False
+    return True
 
 
-def command_sync(root: Path, repos: list[Repo], dry_run: bool) -> None:
+def print_summary(title: str, results: list[tuple[str, bool, str]]) -> int:
+    """Print one status line per item; return 1 if any item failed, else 0."""
+    say()
+    say(f"{title}:")
+    for name, ok, detail in results:
+        say(f"  {'PASS' if ok else 'FAIL'} {name}" + (f" ({detail})" if detail else ""))
+    failed = sum(1 for _, ok, _ in results if not ok)
+    say(f"{len(results) - failed} passed, {failed} failed")
+    return 1 if failed else 0
+
+
+def command_sync(root: Path, repos: list[Repo], dry_run: bool) -> int:
+    results: list[tuple[str, bool, str]] = []
     for repo in repos:
         repo_dir = root / repo.name
-        git_marker = repo_dir / ".git"
-
-        if git_marker.exists():
-            print(f"Pulling {repo.name}")
-            run_command(["git", "-C", str(repo_dir), "pull", "--ff-only"], dry_run=dry_run)
+        if (repo_dir / ".git").exists():
+            say(f"Pulling {repo.name}")
+            code = run_command(["git", "-C", str(repo_dir), "pull", "--ff-only"], dry_run=dry_run)
         elif repo_dir.exists():
-            print(f"Skipping {repo.name}: {repo.name} exists but is not a git repository.")
+            say(f"{repo.name} exists but is not a git repository")
+            results.append((repo.name, False, "exists but is not a git repository; left untouched"))
+            continue
         else:
-            print(f"Cloning {repo.name}")
-            run_command(["git", "clone", repo.url, str(repo_dir)], dry_run=dry_run)
+            say(f"Cloning {repo.name}")
+            code = run_command(["git", "clone", repo.url, str(repo_dir)], dry_run=dry_run)
+        results.append((repo.name, code == 0, f"git exited {code}" if code else ""))
+    return print_summary("Sync summary", results)
 
 
-def command_go(root: Path, projects: list[Repo], subcommand: str, dry_run: bool) -> None:
-    ensure_projects_exist(root, projects)
-
+def command_go(root: Path, projects: list[Repo], subcommand: str, dry_run: bool) -> int:
+    results: list[tuple[str, bool, str]] = []
     for project in projects:
         project_dir = root / project.name
-        print(f"{subcommand.capitalize()}ing {project.name}")
-        run_command(["go", subcommand, "./..."], cwd=project_dir, dry_run=dry_run)
+        say(f"{subcommand.capitalize()}ing {project.name}")
+        if not project_dir.is_dir():
+            say(f"Missing directory {project_dir}; run sync first")
+            results.append((project.name, False, "directory missing; run sync"))
+            continue
+        code = run_command(["go", subcommand, "./..."], cwd=project_dir, dry_run=dry_run)
+        results.append((project.name, code == 0, f"go exited {code}" if code else ""))
+    return print_summary(f"{subcommand.capitalize()} summary", results)
 
 
-def command_clean(root: Path, repos: list[Repo], dry_run: bool, force: bool) -> None:
+def command_clean(root: Path, repos: list[Repo], dry_run: bool, force: bool, discard: bool) -> int:
     if not force:
         raise SystemExit("clean requires --force")
 
+    skipped: list[tuple[str, list[str]]] = []
+    failed = 0
     for repo in repos:
-        remove_path(root / repo.name, dry_run=dry_run)
+        path = root / repo.name
+        if not path.exists() and not path.is_symlink():
+            say(f"Skipping {repo.name}: not found.")
+            continue
+        reasons = local_work_reasons(path)
+        if reasons and not discard:
+            say(f"SKIPPED {repo.name}: {'; '.join(reasons)}")
+            skipped.append((repo.name, reasons))
+            continue
+        if reasons:
+            say(f"Discarding {repo.name}: {'; '.join(reasons)}")
+        if not remove_path(path, dry_run=dry_run):
+            failed += 1
+
+    if skipped:
+        say()
+        say(f"Skipped {len(skipped)} repo(s) holding local work; nothing was deleted for them:")
+        for name, reasons in skipped:
+            say(f"  {name}: {'; '.join(reasons)}")
+        say("Re-run with --discard-changes to delete them too.")
+    return 1 if skipped or failed else 0
 
 
 def main() -> int:
@@ -295,30 +410,20 @@ def main() -> int:
         print(format_names([repo.name for repo in projects], args.format))
         return 0
 
-    print(f"Workspace root: {root}")
-    print(f"Config: {config_path}")
+    say(f"Workspace root: {root}")
+    say(f"Config: {config_path}")
 
     if args.command == "sync":
-        command_sync(root, selected_repos(repos, args.repos), args.dry_run)
-        return 0
+        return command_sync(root, selected_repos(repos, args.repos), args.dry_run)
 
-    if args.command == "build":
-        command_go(root, projects, "build", args.dry_run)
-        return 0
-
-    if args.command == "test":
-        command_go(root, projects, "test", args.dry_run)
-        return 0
+    if args.command in ("build", "test"):
+        return command_go(root, projects, args.command, args.dry_run)
 
     if args.command == "clean":
-        command_clean(root, repos, args.dry_run, args.force)
-        return 0
+        return command_clean(root, repos, args.dry_run, args.force, args.discard_changes)
 
     raise SystemExit(f"Unknown command: {args.command}")
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except subprocess.CalledProcessError as exc:
-        raise SystemExit(exc.returncode) from exc
+    raise SystemExit(main())
