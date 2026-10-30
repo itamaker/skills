@@ -71,7 +71,7 @@ scripts/run.sh save-config --config ./.stitch.json --api-key "$STITCH_API_KEY"
 
 - Precedence is CLI flag, environment variable, config value, built-in default.
 - `save-config` and `--save-config` write the fully resolved result (secrets included) to the loaded config file, or to `<cwd>/.stitch.json` when none was loaded. `--save-config` works on `show-config` and the SDK-backed commands and saves after the command succeeds.
-- A saved `runtime.sdkPackage` keeps its value: a config written under an earlier release still pins that release (for example `@google/stitch-sdk@0.3.5`) until you change it. An exact version in `--sdk-package`, `STITCH_SKILL_SDK_PACKAGE` or this field reinstalls when the cached copy is another version; tags such as `@next` keep the cached copy (add `--force-install` to refresh).
+- A saved `runtime.sdkPackage` keeps its value: a config written under an earlier release still pins that release (for example `@google/stitch-sdk@0.3.5`) until you change it.
 
 ## Auth fields
 
@@ -92,8 +92,10 @@ scripts/run.sh save-config --config ./.stitch.json --api-key "$STITCH_API_KEY"
 
 ## Runtime fields
 
-- `runtime.dir`: where the runner installs `@google/stitch-sdk`. Equivalent to `STITCH_SKILL_RUNTIME_DIR`.
-- `runtime.sdkPackage`: package spec to install on bootstrap. Defaults to `@google/stitch-sdk@0.4.0`. Equivalent to `STITCH_SKILL_SDK_PACKAGE`. Pin another version (for example `@google/stitch-sdk@0.3.5`, or `@google/stitch-sdk@next` to track previews) when the user asks.
+- `runtime.dir`: cache root for SDK installs. Equivalent to `STITCH_SKILL_RUNTIME_DIR`. Each package spec installs into its own subfolder (for example `@google_stitch-sdk@0.4.0`), so pinning another version with a flag or a different project config never replaces the cache of the default. The install happens in a temporary folder that is renamed into place after npm succeeds, and a folder without the `.install-complete` marker is never used. `install-sdk --json` reports `runtimeDir`, `installDir` and `installedVersion`.
+- `runtime.sdkPackage`: package spec to install on bootstrap. Defaults to `@google/stitch-sdk@0.4.0`. Equivalent to `STITCH_SKILL_SDK_PACKAGE`. Pin another version (for example `@google/stitch-sdk@0.3.5`, or `@google/stitch-sdk@next` to track previews) when the user asks. Exact versions are cached per version; a tag such as `@next` keeps its cached copy until `install-sdk --force-install` refreshes it (a failed refresh keeps the old copy and warns on stderr). A spec starting with `-` is rejected; npm runs with `--ignore-scripts`.
+
+The config file chooses what npm installs (`runtime.sdkPackage`, `runtime.dir`), so a `.stitch.json` or `stitch.json` from an untrusted repository deserves the same care as an untrusted `package.json`.
 
 ## Secrets
 

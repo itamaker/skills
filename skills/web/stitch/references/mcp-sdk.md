@@ -217,9 +217,10 @@ await proxy.start(new StdioServerTransport());
 
 Verified by diffing the published 0.3.5 and 0.4.0 packages and driving both against mocked tool responses; the service itself was not called.
 
-- `project.generate`, `screen.edit`, `screen.variants` and `designSystem.apply` return a `Generation` (all screens, iterable, falls through to `.first`) instead of a `Screen` or `Screen[]`. Code that treats the result as a `Screen[]` (`.map`, `.length` on the array) needs `.screens`.
-- `generate`, `edit` and `variants` accept `{ deviceType, modelId }` as the second argument; the positional `(deviceType, modelId)` form still works in both versions. `generate` sends `deviceType: "DESKTOP"` when none is given (0.3.5 sent nothing).
-- `getHtmlUrl()` / `getImageUrl()` are the URL accessors; `getHtml()` / `getImage()` remain as deprecated aliases that return URLs. The 0.4.0 README describes `getHtml()` as returning content, but the shipped code returns the URL; use `readHtml()` for content.
+- `project.generate`, `screen.edit`, `screen.variants` and `designSystem.apply` return a `Generation` (all screens, iterable, falls through to `.first`) instead of a `Screen` or `Screen[]`. `.length` and iteration work on a Generation; code that treats the result as a `Screen[]` (`.map`, `Array.isArray`, `[0]`) needs `.screens`. `variants` and `apply` throw on a response with zero screens, where 0.3.5 returned `[]`.
+- `generate` sends `deviceType: "DESKTOP"` when none is given (0.3.5 sent nothing), so results change for callers without a configured device type.
+- `generate`, `edit` and `variants` accept `{ deviceType, modelId }` as the second argument; the positional `(deviceType, modelId)` form still works in both versions.
+- `getHtmlUrl()` / `getImageUrl()` throw `NOT_FOUND` for a screen without an export where `getHtml()` / `getImage()` returned `""` on 0.3.5 (the runner reports `""` for both). They are the URL accessors; `getHtml()` / `getImage()` remain as deprecated aliases that return URLs. The 0.4.0 README describes `getHtml()` as returning content, but the shipped code returns the URL; use `readHtml()` for content.
 - `Project`, `Screen` and `DesignSystem` constructors are `@deprecated`; use `stitch.project(id)`, `project.screen(id)`, `project.designSystem(id)`. `Project.data` is typed `ProjectData`.
 - New: `readHtml()` / `readImage()`, `uploadDesignMd`, `createDesignSystemFromDesignMd`, tools `delete_project`, `upload_design_md`, `create_design_system_from_design_md`, the `@google/stitch-sdk/tools` entry, client options `retry` and `entityCache`, and `STITCH_BASE_URL` / `STITCH_PROJECT_ID` environment variables.
 - `project.designSystem(id)` keeps an `assets/` prefix in the id (0.3.5 strips it), so `update` and `apply` need the bare id.
