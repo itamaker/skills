@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "webpage2pdf"
-version = "0.1.0"
-description = "Pixel-perfect webpage to paginated PDF via headless Chrome screenshots, bundled as a standalone Claude Code skill"
+version = "0.2.0"
+description = "Webpage to paginated PDF via headless Chrome (pixel-exact screenshots or selectable-text print), bundled as a standalone Claude Code skill"
 license = { text = "MIT" }
 authors = [{ name = "Zhaoyang Jia", email = "zhaoyang.jia@ieee.org" }]
 requires-python = ">=3.9"
@@ -15,8 +15,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/itamaker/webpage-to-pdf-skill"
-Issues = "https://github.com/itamaker/webpage-to-pdf-skill/issues"
+Homepage = "https://github.com/itamaker/skills"
+Issues = "https://github.com/itamaker/skills/issues"
 
 [project.scripts]
 webpage2pdf = "webpage2pdf.cli:main"

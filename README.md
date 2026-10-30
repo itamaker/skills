@@ -74,9 +74,9 @@ Command-line tools and skills for building and evaluating LLM agents: authoring 
 
 Work with web pages and web-based design tools.
 
-- **[webpage-to-pdf](./skills/web/webpage-to-pdf/SKILL.md)**: Export a live webpage as a pixel-perfect, paginated PDF via headless Chrome screenshots.
-- **[stitch](./skills/web/stitch/SKILL.md)**: Generate and edit designs with Google Stitch through a bundled SDK runner, and turn the output into app code.
-- **[remote-browser](./skills/web/remote-browser/SKILL.md)**: Give Claude a cloud browser on your own Cloudflare account: read JavaScript-heavy pages and hand you a live session for manual logins.
+- **[webpage-to-pdf](./skills/web/webpage-to-pdf/SKILL.md)**: Save a live webpage as a PDF, pixel-exact or with searchable text.
+- **[stitch](./skills/web/stitch/SKILL.md)**: Generate and edit Google Stitch designs and turn them into app code.
+- **[remote-browser](./skills/web/remote-browser/SKILL.md)**: Cloud browser on your Cloudflare account for JavaScript pages and manual logins.
 
 ### Dev
 
