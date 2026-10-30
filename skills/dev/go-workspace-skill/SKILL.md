@@ -1,6 +1,6 @@
 ---
 name: go-workspace-skill
-description: Config-driven manager for a multi-repo Go workspace: sync, build, test, list and safely clean its repos. Use when syncing, building or testing several Go repos together, or when deleting their local checkouts.
+description: Config-driven manager for a multi-repo Go workspace: sync, build, test, list and clean its repos. Use when syncing, building or testing several Go repos together, or when deleting their local checkouts.
 ---
 
 # Go Workspace Skill
@@ -26,11 +26,20 @@ A workspace config file is the source of truth for repo names, clone URLs, and w
    - `sync` needs network access and Git credentials; surface a blocked network instead of retrying.
    - A path that exists but is not a git repository is never replaced; `sync` reports it as FAIL.
 
-## Cleaning safely
+## Cleaning
 
-`clean` deletes directories, so treat each step as a checkpoint:
+`clean` deletes directories, so it deletes a repo only when every check below finds nothing. Anything else is SKIPPED with its reason, left on disk, and the command exits non-zero.
 
-1. Confirm the user wants the managed checkouts deleted, then run `clean --force` (use `--dry-run` first if unsure).
-2. It deletes only repos with a clean tree and every commit on a remote branch. Any other repo is listed as SKIPPED with its reason, and the command exits non-zero.
-3. If anything was skipped, show the user the skipped list with reasons and ask whether to delete those too.
-4. Only after a fresh yes to that list, run `clean --force --discard-changes`. Earlier consent to `clean` does not cover discarding local work.
+What `clean` checks per repo:
+- uncommitted or untracked changes, including inside submodules, and files hidden from status (assume-unchanged, skip-worktree)
+- ignored files (`.env`, `go.work`, `*.local.*`, anything from `.gitignore`, `.git/info/exclude`, or the user's global excludes)
+- stashes
+- commits on any ref (branches, tags, detached HEAD) that no remote-tracking ref contains; "pushed" means on a remote-tracking ref as of the last fetch, and `clean` never fetches, so run `git fetch` in a repo first when freshness matters
+- linked worktrees, and entries that are themselves a linked worktree or submodule checkout
+- initialized submodules
+- symlinks and directories that are not git repos
+
+Steps:
+1. Confirm the user wants the managed checkouts deleted, then run `clean --force` (add `--dry-run` first to preview).
+2. If anything was skipped, show the user the skipped list with reasons and ask which of those repos to delete.
+3. For each repo the user approves by name, run `clean --force --discard-changes NAME [NAME ...]` with exactly those names. Repos not named stay skipped, and earlier consent to `clean` does not cover discarding local work.

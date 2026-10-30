@@ -70,12 +70,16 @@ def invalid_name_reason(name: str) -> str | None:
     """Why `name` cannot be a direct child directory of the workspace root, or None if it can."""
     if not name.strip():
         return "is empty"
-    if name in (".", ".git"):
+    if name == "." or name.casefold() == ".git":
         return "must not be '.' or '.git'"
     if "/" in name or "\\" in name:
         return "must not contain '/' or '\\'"
     if ".." in name:
         return "must not contain '..'"
+    if ":" in name:
+        return "must not contain ':'"
+    if name.endswith((".", " ")):
+        return "must not end with '.' or a space"
     if Path(name).is_absolute() or PureWindowsPath(name).is_absolute():
         return "must not be an absolute path"
     return None
@@ -152,8 +156,10 @@ def parse_args() -> argparse.Namespace:
     )
     clean_parser.add_argument(
         "--discard-changes",
-        action="store_true",
-        help="Also delete repos holding uncommitted work, unpushed commits or non-git directories.",
+        nargs="+",
+        metavar="NAME",
+        help="Also delete these named repos if clean skipped them for holding local work. "
+        "Other skipped repos stay in place.",
     )
 
     init_parser = subparsers.add_parser("init-config", help="Write an example workspace config.")
@@ -222,6 +228,15 @@ def say(message: str = "") -> None:
     print(message, flush=True)
 
 
+GIT_REPO_ENV = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY")
+GIT_PROBE = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false"]
+
+
+def child_env() -> dict[str, str]:
+    """Environment for child processes, minus variables that would redirect git to another repo."""
+    return {key: value for key, value in os.environ.items() if key not in GIT_REPO_ENV}
+
+
 def run_command(cmd: list[str], *, cwd: Path | None = None, dry_run: bool) -> int:
     """Run cmd with output streaming; return its exit code (127 if it cannot start)."""
     prefix = "[dry-run] " if dry_run else ""
@@ -232,7 +247,7 @@ def run_command(cmd: list[str], *, cwd: Path | None = None, dry_run: bool) -> in
         return 0
 
     try:
-        return subprocess.run(cmd, cwd=str(cwd) if cwd else None).returncode
+        return subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=child_env()).returncode
     except OSError as exc:
         say(f"Cannot run {cmd[0]}: {exc}")
         return 127
@@ -242,10 +257,11 @@ def git_output(repo_dir: Path, *args: str) -> str:
     """Stdout of a read-only git command in repo_dir; raises RuntimeError if git fails."""
     try:
         proc = subprocess.run(
-            ["git", "-C", str(repo_dir), *args],
+            [*GIT_PROBE, "-C", str(repo_dir), *args],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
+            env=child_env(),
         )
     except OSError as exc:
         raise RuntimeError(f"cannot run git: {exc}")
@@ -254,10 +270,9 @@ def git_output(repo_dir: Path, *args: str) -> str:
     return proc.stdout
 
 
-def git_succeeds(repo_dir: Path, *args: str) -> bool:
-    """True if a read-only git command exits 0 in repo_dir."""
-    quiet = subprocess.DEVNULL
-    return subprocess.run(["git", "-C", str(repo_dir), *args], stdout=quiet, stderr=quiet).returncode == 0
+def names_summary(names: list[str]) -> str:
+    shown = ", ".join(names[:3])
+    return f"{shown}, ... ({len(names)})" if len(names) > 3 else f"{shown} ({len(names)})"
 
 
 def local_work_reasons(repo_dir: Path) -> list[str]:
@@ -268,22 +283,42 @@ def local_work_reasons(repo_dir: Path) -> list[str]:
     """
     if repo_dir.is_symlink():
         return ["is a symlink"]
-    if not (repo_dir / ".git").exists():
+    dot_git = repo_dir / ".git"
+    if not dot_git.exists():
         return ["is not a git repository"]
+    if dot_git.is_file():
+        return ["is a linked worktree or submodule checkout"]
     reasons: list[str] = []
     try:
-        if git_output(repo_dir, "status", "--porcelain", "--untracked-files=all").strip():
+        if git_output(repo_dir, "status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none").strip():
             reasons.append("uncommitted or untracked changes")
-        tips = ["--branches"]
-        if not git_succeeds(repo_dir, "symbolic-ref", "-q", "HEAD") and git_succeeds(
-            repo_dir, "rev-parse", "-q", "--verify", "HEAD"
-        ):
-            tips.append("HEAD")  # detached HEAD: its commits belong to no branch
-        unpushed = int(git_output(repo_dir, "rev-list", "--count", *tips, "--not", "--remotes").strip())
+        hidden = [
+            entry[2:]
+            for entry in git_output(repo_dir, "ls-files", "-v", "-z").split("\0")
+            if entry[:1].islower() or entry[:1] == "S"
+        ]
+        if hidden:
+            reasons.append(f"files hidden from status by assume-unchanged or skip-worktree: {names_summary(hidden)}")
+        ignored = [n for n in git_output(
+            repo_dir, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"
+        ).split("\0") if n]
+        if ignored:
+            reasons.append(f"ignored files present: {names_summary(ignored)}")
+        if git_output(repo_dir, "for-each-ref", "--count=1", "refs/stash").strip():
+            reasons.append("stashed changes")
+        unpushed = int(git_output(repo_dir, "rev-list", "--count", "--all", "--not", "--remotes").strip())
         if unpushed:
             reasons.append(f"{unpushed} commit(s) not on any remote branch")
-        if git_succeeds(repo_dir, "rev-parse", "-q", "--verify", "refs/stash"):
-            reasons.append("stashed changes")
+        trees = [line[9:] for line in git_output(repo_dir, "worktree", "list", "--porcelain").splitlines()
+                 if line.startswith("worktree ")]
+        if len(trees) > 1:
+            reasons.append(f"has linked worktrees: {', '.join(trees[1:])}")
+        modules = dot_git / "modules"
+        keys = [e.split("\n", 1)[0] for e in git_output(repo_dir, "config", "--local", "--list", "-z").split("\0")]
+        if any(k.startswith("submodule.") and k.endswith(".url") for k in keys) or (
+            modules.is_dir() and any(modules.iterdir())
+        ):
+            reasons.append("has initialized submodules")
     except (RuntimeError, ValueError, OSError) as exc:
         reasons.append(f"could not verify: {exc}")
     return reasons
@@ -330,63 +365,96 @@ def print_summary(title: str, results: list[tuple[str, bool, str]]) -> int:
 
 def command_sync(root: Path, repos: list[Repo], dry_run: bool) -> int:
     results: list[tuple[str, bool, str]] = []
-    for repo in repos:
-        repo_dir = root / repo.name
-        if (repo_dir / ".git").exists():
-            say(f"Pulling {repo.name}")
-            code = run_command(["git", "-C", str(repo_dir), "pull", "--ff-only"], dry_run=dry_run)
-        elif repo_dir.exists():
-            say(f"{repo.name} exists but is not a git repository")
-            results.append((repo.name, False, "exists but is not a git repository; left untouched"))
-            continue
-        else:
-            say(f"Cloning {repo.name}")
-            code = run_command(["git", "clone", repo.url, str(repo_dir)], dry_run=dry_run)
-        results.append((repo.name, code == 0, f"git exited {code}" if code else ""))
+    name = ""
+    try:
+        for repo in repos:
+            name = repo.name
+            repo_dir = root / repo.name
+            if (repo_dir / ".git").exists():
+                say(f"Pulling {repo.name}")
+                code = run_command(["git", "-C", str(repo_dir), "pull", "--ff-only"], dry_run=dry_run)
+            elif repo_dir.exists():
+                say(f"{repo.name} exists but is not a git repository")
+                results.append((repo.name, False, "exists but is not a git repository; left untouched"))
+                continue
+            else:
+                say(f"Cloning {repo.name}")
+                code = run_command(["git", "clone", "--", repo.url, str(repo_dir)], dry_run=dry_run)
+            results.append((repo.name, code == 0, f"git exited {code}" if code else ""))
+    except KeyboardInterrupt:
+        results.append((name, False, "interrupted"))
+        print_summary("Sync summary", results)
+        return 130
     return print_summary("Sync summary", results)
 
 
 def command_go(root: Path, projects: list[Repo], subcommand: str, dry_run: bool) -> int:
+    title = f"{subcommand.capitalize()} summary"
+    if not projects:
+        say("Warning: no Go projects configured (go_project is false for every repo); nothing to run.")
+        return 1
     results: list[tuple[str, bool, str]] = []
-    for project in projects:
-        project_dir = root / project.name
-        say(f"{subcommand.capitalize()}ing {project.name}")
-        if not project_dir.is_dir():
-            say(f"Missing directory {project_dir}; run sync first")
-            results.append((project.name, False, "directory missing; run sync"))
-            continue
-        code = run_command(["go", subcommand, "./..."], cwd=project_dir, dry_run=dry_run)
-        results.append((project.name, code == 0, f"go exited {code}" if code else ""))
-    return print_summary(f"{subcommand.capitalize()} summary", results)
+    name = ""
+    try:
+        for project in projects:
+            name = project.name
+            project_dir = root / project.name
+            say(f"{subcommand.capitalize()}ing {project.name}")
+            if not project_dir.is_dir():
+                say(f"Missing directory {project_dir}; run sync first")
+                results.append((project.name, False, "directory missing; run sync"))
+                continue
+            code = run_command(["go", subcommand, "./..."], cwd=project_dir, dry_run=dry_run)
+            results.append((project.name, code == 0, f"go exited {code}" if code else ""))
+    except KeyboardInterrupt:
+        results.append((name, False, "interrupted"))
+        print_summary(title, results)
+        return 130
+    return print_summary(title, results)
 
 
-def command_clean(root: Path, repos: list[Repo], dry_run: bool, force: bool, discard: bool) -> int:
+def command_clean(root: Path, repos: list[Repo], dry_run: bool, force: bool, discard: list[str] | None) -> int:
     if not force:
         raise SystemExit("clean requires --force")
+    discard_names = set(discard or [])
+    unknown = sorted(discard_names - {repo.name for repo in repos})
+    if unknown:
+        raise SystemExit(f"--discard-changes names not in the config: {', '.join(unknown)}")
 
     skipped: list[tuple[str, list[str]]] = []
+    discarded: set[str] = set()
     failed = 0
-    for repo in repos:
-        path = root / repo.name
-        if not path.exists() and not path.is_symlink():
-            say(f"Skipping {repo.name}: not found.")
-            continue
-        reasons = local_work_reasons(path)
-        if reasons and not discard:
-            say(f"SKIPPED {repo.name}: {'; '.join(reasons)}")
-            skipped.append((repo.name, reasons))
-            continue
-        if reasons:
-            say(f"Discarding {repo.name}: {'; '.join(reasons)}")
-        if not remove_path(path, dry_run=dry_run):
-            failed += 1
+    interrupted = False
+    try:
+        for repo in repos:
+            path = root / repo.name
+            if not path.exists() and not path.is_symlink():
+                say(f"Skipping {repo.name}: not found.")
+                continue
+            reasons = local_work_reasons(path)
+            if reasons and repo.name not in discard_names:
+                say(f"SKIPPED {repo.name}: {'; '.join(reasons)}")
+                skipped.append((repo.name, reasons))
+                continue
+            if reasons:
+                say(f"Discarding {repo.name}: {'; '.join(reasons)}")
+                discarded.add(repo.name)
+            if not remove_path(path, dry_run=dry_run):
+                failed += 1
+    except KeyboardInterrupt:
+        say("Interrupted; remaining repos were not examined.")
+        interrupted = True
 
+    for name in sorted(discard_names - discarded):
+        say(f"Note: {name} had no local work to discard (removed normally, or not on disk).")
     if skipped:
         say()
         say(f"Skipped {len(skipped)} repo(s) holding local work; nothing was deleted for them:")
         for name, reasons in skipped:
             say(f"  {name}: {'; '.join(reasons)}")
-        say("Re-run with --discard-changes to delete them too.")
+        say("To delete some of them, re-run with: --discard-changes NAME [NAME ...]")
+    if interrupted:
+        return 130
     return 1 if skipped or failed else 0
 
 
@@ -426,4 +494,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        say("Interrupted.")
+        raise SystemExit(130)
