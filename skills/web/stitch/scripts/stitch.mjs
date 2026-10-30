@@ -16,7 +16,16 @@ const CONFIG_ENV_VAR = "STITCH_SKILL_CONFIG";
 const DEFAULT_CONFIG_NAMES = [".stitch.json", "stitch.json"];
 const DEFAULT_BASE_URL = "https://stitch.googleapis.com/mcp";
 const DEFAULT_TIMEOUT_MS = 300000;
-const DEFAULT_SDK_PACKAGE = "@google/stitch-sdk@0.3.5";
+const DEFAULT_SDK_PACKAGE = "@google/stitch-sdk@0.4.0";
+// Newest id in the 0.4.0 tool schema (highest-numbered, and one of the two ids its README documents).
+const DEFAULT_MODEL_ID = "GEMINI_3_8_FLASH";
+const KNOWN_MODEL_IDS = [
+  "GEMINI_3_8_FLASH",
+  "GEMINI_3_5_FLASH_LITE",
+  "GEMINI_3_PRO",
+  "GEMINI_3_FLASH",
+  "GEMINI_3_1_PRO",
+];
 const DEFAULT_RUNTIME_DIR_TEMPLATE = "~/.cache/itamaker-skills/stitch-sdk";
 const DEFAULT_RUNTIME_DIR = path.join(
   process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache"),
@@ -34,7 +43,7 @@ const DEFAULT_CONFIG_TEMPLATE = {
   defaults: {
     projectId: "",
     deviceType: "DESKTOP",
-    modelId: "GEMINI_3_PRO",
+    modelId: DEFAULT_MODEL_ID,
     variantCount: 3,
     creativeRange: "EXPLORE",
     variantAspects: ["LAYOUT", "COLOR_SCHEME"],
@@ -265,6 +274,7 @@ function resolvedSettings(configData, cliValues) {
         undefined,
       baseUrl:
         cliValues["base-url"] ||
+        process.env.STITCH_BASE_URL ||
         process.env.STITCH_HOST ||
         auth.baseUrl ||
         DEFAULT_BASE_URL,
@@ -281,7 +291,8 @@ function resolvedSettings(configData, cliValues) {
         normalizeEnum(defaults.deviceType, "deviceType"),
       modelId:
         normalizeEnum(cliValues["model-id"], "modelId") ||
-        normalizeEnum(defaults.modelId, "modelId"),
+        normalizeEnum(defaults.modelId, "modelId") ||
+        DEFAULT_MODEL_ID,
       variantCount: cliValues["variant-count"]
         ? coercePositiveInt(cliValues["variant-count"], "variant-count")
         : defaults.variantCount
@@ -425,47 +436,108 @@ async function readPrompt(values) {
   fail("Missing prompt. Pass --prompt or --prompt-file.");
 }
 
+async function installedSdkVersion(packageJsonPath) {
+  try {
+    return JSON.parse(await fsp.readFile(packageJsonPath, "utf8")).version;
+  } catch {
+    return undefined;
+  }
+}
+
+const INSTALL_MARKER = ".install-complete";
+
+// Each package spec installs into its own subdirectory of the runtime dir, so a
+// one-off --sdk-package pin never touches the cache of another spec.
+function sdkInstallDir(settings) {
+  return path.join(
+    settings.runtime.dir,
+    settings.runtime.sdkPackage.replace(/[^\w.@-]/g, "_"),
+  );
+}
+
+function sdkPackageJsonPath(installDir) {
+  return path.join(installDir, "node_modules", "@google", "stitch-sdk", "package.json");
+}
+
+// An install counts only when the marker (written after npm succeeded) exists
+// and, for an exact pin, the installed version matches it.
+async function isCompleteInstall(installDir, sdkPackage) {
+  const packageJsonPath = sdkPackageJsonPath(installDir);
+  if (!(await pathExists(path.join(installDir, INSTALL_MARKER))) || !(await pathExists(packageJsonPath))) {
+    return false;
+  }
+  const pinned = sdkPackage.match(/@(\d+\.\d+\.\d+(?:[-+][\w.-]+)?)$/)?.[1];
+  return !pinned || (await installedSdkVersion(packageJsonPath)) === pinned;
+}
+
 async function ensureSdkInstalled(settings, { forceInstall = false } = {}) {
-  const runtimeDir = settings.runtime.dir;
-  const packageJsonPath = path.join(runtimeDir, "node_modules", "@google", "stitch-sdk", "package.json");
-  if (!forceInstall && (await pathExists(packageJsonPath))) {
-    return packageJsonPath;
+  const sdkPackage = settings.runtime.sdkPackage;
+  if (sdkPackage.startsWith("-")) {
+    fail(`Invalid sdk-package "${sdkPackage}": a package spec cannot start with "-".`);
+  }
+  const installDir = sdkInstallDir(settings);
+  const packageJsonPath = sdkPackageJsonPath(installDir);
+  const alreadyComplete = await isCompleteInstall(installDir, sdkPackage);
+  if (!forceInstall && alreadyComplete) {
+    return { installDir, packageJsonPath };
   }
 
-  await fsp.mkdir(runtimeDir, { recursive: true });
-  const installArgs = [
-    "install",
-    "--prefix",
-    runtimeDir,
-    settings.runtime.sdkPackage,
-    "--package-lock=false",
-    "--no-save",
-  ];
-  const install = spawnSync("npm", installArgs, {
-    stdio: "inherit",
-  });
-  if (install.status !== 0) {
-    fail(`Failed to install ${settings.runtime.sdkPackage} into ${runtimeDir}`);
+  await fsp.mkdir(settings.runtime.dir, { recursive: true });
+  const tmpDir = `${installDir}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    await fsp.mkdir(tmpDir, { recursive: true });
+    // npm progress goes to stderr so --json stdout stays parseable.
+    const install = spawnSync(
+      "npm",
+      ["install", "--prefix", tmpDir, sdkPackage, "--package-lock=false", "--no-save", "--ignore-scripts"],
+      { stdio: ["ignore", 2, 2] },
+    );
+    if (install.status !== 0 || !(await pathExists(sdkPackageJsonPath(tmpDir)))) {
+      throw new Error(`npm install of ${sdkPackage} failed`);
+    }
+    await fsp.writeFile(path.join(tmpDir, INSTALL_MARKER), `${new Date().toISOString()}\n`);
+
+    const retired = `${installDir}.old-${process.pid}-${Date.now()}`;
+    const hadDir = await pathExists(installDir);
+    if (hadDir) {
+      await fsp.rename(installDir, retired);
+    }
+    try {
+      await fsp.rename(tmpDir, installDir);
+    } catch (error) {
+      if (hadDir) {
+        await fsp.rename(retired, installDir).catch(() => {});
+      }
+      // Another run may have finished the same install first.
+      if (!(await isCompleteInstall(installDir, sdkPackage))) {
+        throw error;
+      }
+    }
+    if (hadDir) {
+      await fsp.rm(retired, { recursive: true, force: true });
+    }
+  } catch (error) {
+    await fsp.rm(tmpDir, { recursive: true, force: true });
+    if (alreadyComplete) {
+      console.error(
+        `Warning: could not refresh ${sdkPackage} (${error.message}); keeping the existing install in ${installDir}.`,
+      );
+      return { installDir, packageJsonPath };
+    }
+    fail(`Failed to install ${sdkPackage} into ${installDir}: ${error.message}`);
   }
-  return packageJsonPath;
+  return { installDir, packageJsonPath };
 }
 
 async function loadSdkModules(settings) {
-  const packageJsonPath = await ensureSdkInstalled(settings);
+  const { packageJsonPath } = await ensureSdkInstalled(settings);
   const packageDir = path.dirname(packageJsonPath);
   const packageJson = JSON.parse(await fsp.readFile(packageJsonPath, "utf8"));
 
+  // Load only the main entry: "@google/stitch-sdk/ai" needs the optional peer
+  // dependency "ai" (SDK 0.4.0 throws without it) and the runner never uses it.
   const mainEntry = path.join(packageDir, packageJson.exports["."].import);
-  const aiEntry = packageJson.exports["./ai"]
-    ? path.join(packageDir, packageJson.exports["./ai"].import)
-    : null;
-
-  const sdk = await import(pathToFileURL(mainEntry).href);
-  const ai = aiEntry ? await import(pathToFileURL(aiEntry).href) : {};
-  return {
-    ...sdk,
-    ...ai,
-  };
+  return await import(pathToFileURL(mainEntry).href);
 }
 
 function createClientConfig(settings) {
@@ -528,6 +600,16 @@ function normalizeScreen(screen, extras = {}) {
   };
 }
 
+// SDK 0.3.x strips the "assets/" resource prefix from a design system id; 0.4.0 does not.
+// Accept `9`, `assets/9` or `projects/P/assets/9`.
+function normalizeAssetId(rawId) {
+  const id = String(rawId).trim().replace(/\/+$/, "").split("/").pop();
+  if (!id) {
+    fail("Invalid --asset-id.");
+  }
+  return id;
+}
+
 function normalizeDesignSystem(designSystem, extras = {}) {
   const data = designSystem.data ?? null;
   return {
@@ -538,6 +620,50 @@ function normalizeDesignSystem(designSystem, extras = {}) {
     data,
     ...extras,
   };
+}
+
+// SDK 0.4.0 returns a Generation (all screens in .screens, first screen proxied);
+// SDK 0.3.x returns a Screen or Screen[]. Normalize both to an array of screens.
+function toScreenList(result) {
+  if (Array.isArray(result)) {
+    return result;
+  }
+  if (result && Array.isArray(result.screens)) {
+    return [...result.screens];
+  }
+  return [result];
+}
+
+// 0.4.0 names the URL accessors getHtmlUrl/getImageUrl (getHtml/getImage are
+// deprecated aliases); 0.3.x only has getHtml/getImage.
+// A screen without an export returns "" on 0.3.x and throws NOT_FOUND on 0.4.0;
+// report both as "". Any other error propagates.
+async function exportUrl(screen, urlMethod, legacyMethod) {
+  try {
+    return (await (screen[urlMethod] ?? screen[legacyMethod]).call(screen)) || "";
+  } catch (error) {
+    if (error?.code === "NOT_FOUND") {
+      return "";
+    }
+    throw error;
+  }
+}
+
+async function screenExportUrls(screen) {
+  return Promise.all([
+    exportUrl(screen, "getHtmlUrl", "getHtml"),
+    exportUrl(screen, "getImageUrl", "getImage"),
+  ]);
+}
+
+// Never lose a finished generation to an export problem: report it on the entry.
+async function safeExportUrls(screen) {
+  try {
+    const [htmlUrl, imageUrl] = await screenExportUrls(screen);
+    return { htmlUrl, imageUrl };
+  } catch (error) {
+    return { htmlUrl: "", imageUrl: "", exportError: error?.message || String(error) };
+  }
 }
 
 async function readJsonInput(values, { fileKey, jsonKey, label }) {
@@ -594,8 +720,7 @@ async function downloadUrlToFile(url, outputPath) {
 
 async function getScreenWithExports(project, screenId) {
   const screen = await project.getScreen(screenId);
-  const [htmlUrl, imageUrl] = await Promise.all([screen.getHtml(), screen.getImage()]);
-  return normalizeScreen(screen, { htmlUrl, imageUrl });
+  return normalizeScreen(screen, await safeExportUrls(screen));
 }
 
 async function commandInitConfig(values) {
@@ -629,13 +754,15 @@ async function commandSaveConfig(values, config) {
 
 async function commandInstallSdk(values, config) {
   const settings = resolvedSettings(config.data, values);
-  const packageJsonPath = await ensureSdkInstalled(settings, {
+  const { installDir, packageJsonPath } = await ensureSdkInstalled(settings, {
     forceInstall: Boolean(values["force-install"]),
   });
   printOutput(
     {
       runtimeDir: settings.runtime.dir,
+      installDir,
       sdkPackage: settings.runtime.sdkPackage,
+      installedVersion: await installedSdkVersion(packageJsonPath),
       packageJsonPath,
     },
     Boolean(values.json),
@@ -713,16 +840,41 @@ function generationArgs(values, settings) {
 }
 
 async function hydrateScreenResult(screen, values) {
-  const [htmlUrl, imageUrl] = await Promise.all([screen.getHtml(), screen.getImage()]);
-  const result = normalizeScreen(screen, { htmlUrl, imageUrl });
+  const urls = await safeExportUrls(screen);
+  const result = normalizeScreen(screen, urls);
 
-  if (values["html-out"]) {
-    result.htmlPath = await downloadUrlToFile(htmlUrl, values["html-out"]);
-  }
-  if (values["image-out"]) {
-    result.imagePath = await downloadUrlToFile(imageUrl, values["image-out"]);
+  for (const [flag, url, key] of [
+    ["html-out", urls.htmlUrl, "htmlPath"],
+    ["image-out", urls.imageUrl, "imagePath"],
+  ]) {
+    if (!values[flag]) {
+      continue;
+    }
+    try {
+      if (!url) {
+        throw new Error("the screen has no URL for this export");
+      }
+      result[key] = await downloadUrlToFile(url, values[flag]);
+    } catch (error) {
+      result[`${key.replace("Path", "")}DownloadError`] = error?.message || String(error);
+      process.exitCode = 1;
+    }
   }
 
+  return result;
+}
+
+// Hydrate the first screen of a generation (CLI output shape of SDK 0.3.x) and
+// list any further screens under `additionalScreens` (SDK 0.4.0 can return several).
+async function hydrateGeneration(generation, values) {
+  const [first, ...rest] = toScreenList(generation);
+  const result = await hydrateScreenResult(first, values);
+  if (rest.length > 0) {
+    result.additionalScreens = [];
+    for (const screen of rest) {
+      result.additionalScreens.push(normalizeScreen(screen, await safeExportUrls(screen)));
+    }
+  }
   return result;
 }
 
@@ -740,12 +892,16 @@ async function commandGenerate(values, config) {
     } else if (values["create-project-title"]) {
       project = await sdk.createProject(values["create-project-title"]);
       projectId = project.id;
+      // Record the new project before the slow generation so a later failure cannot lose it.
+      console.error(`Created project ${projectId}`);
+      settings.defaults.projectId = projectId;
+      await maybePersistResolvedConfig(values, config, settings);
     } else {
       fail("Missing --project-id. Use --create-project-title to create a project on the fly.");
     }
 
-    const screen = await project.generate(prompt, deviceType, modelId);
-    const result = await hydrateScreenResult(screen, values);
+    const generation = await project.generate(prompt, deviceType, modelId);
+    const result = await hydrateGeneration(generation, values);
     result.projectId = projectId;
     settings.defaults.projectId = projectId;
     await maybePersistResolvedConfig(values, config, settings);
@@ -769,7 +925,7 @@ async function commandEdit(values, config) {
     const screen = await project.getScreen(values["screen-id"]);
     const edited = await screen.edit(prompt, deviceType, modelId);
     await maybePersistResolvedConfig(values, config, settings);
-    printOutput(await hydrateScreenResult(edited, values), Boolean(values.json));
+    printOutput(await hydrateGeneration(edited, values), Boolean(values.json));
   } finally {
     await client.close();
   }
@@ -797,7 +953,7 @@ async function commandVariants(values, config) {
     const screen = await project.getScreen(values["screen-id"]);
     const variants = await screen.variants(prompt, variantOptions, deviceType, modelId);
     const hydrated = [];
-    for (const variant of variants) {
+    for (const variant of toScreenList(variants)) {
       hydrated.push(await hydrateScreenResult(variant, values));
     }
     await maybePersistResolvedConfig(values, config, settings);
@@ -854,7 +1010,7 @@ async function commandUpdateDesignSystem(values, config) {
   const { client, sdk } = await createSdk(settings);
   try {
     const project = sdk.project(projectId);
-    const designSystem = project.designSystem(values["asset-id"]);
+    const designSystem = project.designSystem(normalizeAssetId(values["asset-id"]));
     const updated = await designSystem.update(designSystemPayload);
     await maybePersistResolvedConfig(values, config, settings);
     printOutput(normalizeDesignSystem(updated), Boolean(values.json));
@@ -880,10 +1036,10 @@ async function commandApplyDesignSystem(values, config) {
   const { client, sdk } = await createSdk(settings);
   try {
     const project = sdk.project(projectId);
-    const designSystem = project.designSystem(values["asset-id"]);
+    const designSystem = project.designSystem(normalizeAssetId(values["asset-id"]));
     const screens = await designSystem.apply(selections);
     await maybePersistResolvedConfig(values, config, settings);
-    printOutput(screens.map(screen => normalizeScreen(screen)), Boolean(values.json));
+    printOutput(toScreenList(screens).map(screen => normalizeScreen(screen)), Boolean(values.json));
   } finally {
     await client.close();
   }
@@ -902,7 +1058,13 @@ async function commandDownloadArtifact(values, config, kind) {
   try {
     const project = sdk.project(projectId);
     const screen = await project.getScreen(values["screen-id"]);
-    const url = kind === "html" ? await screen.getHtml() : await screen.getImage();
+    const url =
+      kind === "html"
+        ? await exportUrl(screen, "getHtmlUrl", "getHtml")
+        : await exportUrl(screen, "getImageUrl", "getImage");
+    if (!url) {
+      fail(`Screen ${values["screen-id"]} has no ${kind} export URL.`);
+    }
     const outputPath = await downloadUrlToFile(url, values.out);
     await maybePersistResolvedConfig(values, config, settings);
     printOutput({ url, outputPath }, Boolean(values.json));
@@ -963,11 +1125,11 @@ function commandUsage(command) {
     "get-screen":
       "stitch get-screen --project-id <id> --screen-id <id> [--include-exports] [common-options]",
     "generate":
-      "stitch generate (--project-id <id> | --create-project-title <title>) (--prompt <text> | --prompt-file <path>) [--device-type ...] [--model-id ...] [--html-out path] [--image-out path] [common-options]",
+      `stitch generate (--project-id <id> | --create-project-title <title>) (--prompt <text> | --prompt-file <path>) [--device-type ...] [--model-id ${KNOWN_MODEL_IDS.join("|")}] [--html-out path] [--image-out path] [common-options]`,
     "edit":
-      "stitch edit --project-id <id> --screen-id <id> (--prompt <text> | --prompt-file <path>) [--device-type ...] [--model-id ...] [--html-out path] [--image-out path] [common-options]",
+      `stitch edit --project-id <id> --screen-id <id> (--prompt <text> | --prompt-file <path>) [--device-type ...] [--model-id ${KNOWN_MODEL_IDS.join("|")}] [--html-out path] [--image-out path] [common-options]`,
     "variants":
-      "stitch variants --project-id <id> --screen-id <id> (--prompt <text> | --prompt-file <path>) [--variant-count n] [--creative-range ...] [--aspects a,b] [--device-type ...] [--model-id ...] [common-options]",
+      `stitch variants --project-id <id> --screen-id <id> (--prompt <text> | --prompt-file <path>) [--variant-count n] [--creative-range ...] [--aspects a,b] [--device-type ...] [--model-id ${KNOWN_MODEL_IDS.join("|")}] [common-options]`,
     "list-design-systems":
       "stitch list-design-systems --project-id <id> [common-options]",
     "create-design-system":
@@ -1198,6 +1360,13 @@ try {
   const payload = {
     error: error?.message || String(error),
   };
+  // StitchError details (for example CLARIFICATION_REQUIRED carries Stitch's question).
+  if (error?.code && typeof error.code === "string") {
+    payload.code = error.code;
+  }
+  if (error?.clarification) {
+    payload.clarification = error.clarification;
+  }
   console.error(JSON.stringify(payload, null, 2));
   process.exit(exitCode);
 }
