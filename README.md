@@ -62,7 +62,7 @@ Every skill here is **model-invoked**: the agent reaches for it when the task ma
 
 ### Agent Tooling
 
-Command-line tools and skills for building and evaluating LLM agents: authoring skills, reading traces, scoring retrieval, testing prompts and auditing datasets.
+Command-line tools and skills for building and evaluating LLM agents: reading traces, scoring retrieval, testing prompts and auditing datasets.
 
 - **[runlens](./skills/agent-tooling/runlens/SKILL.md)**: Find failures, flaky tools and latency outliers in agent JSONL traces.
 - **[ragcheck](./skills/agent-tooling/ragcheck/SKILL.md)**: Score retrieval runs with P/R/MRR/MAP/nDCG@k and check answers by word overlap.
