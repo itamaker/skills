@@ -13,6 +13,7 @@ from .core import (
     launch_browser,
     log,
     paginate,
+    print_to_pdf,
     save_pdf,
     trigger_lazy_load,
     wait_for_page,
@@ -32,9 +33,10 @@ def default_output(url):
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="webpage2pdf",
-        description="Export a web page as a pixel-perfect paginated PDF "
-                    "(Chrome screenshot based), with automatic headers and "
-                    "footers showing title, date, URL and page numbers.",
+        description="Export a web page as a paginated PDF with automatic headers "
+                    "and footers showing title, date, URL and page numbers. "
+                    "--mode image (default) is a pixel-exact Chrome screenshot; "
+                    "--mode text is a vector PDF with selectable, searchable text.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("url", help="page to export (the https:// prefix may be omitted)")
@@ -42,6 +44,9 @@ def build_parser():
                         help="output PDF path (derived from the URL by default)")
     parser.add_argument("-o", "--output", dest="output_opt", metavar="PATH",
                         help="output PDF path, same as the second positional argument")
+    parser.add_argument("--mode", default="image", choices=["image", "text"],
+                        help="image: pixel-exact screenshot pages; text: vector PDF "
+                             "(Chrome print engine) with selectable text and a much smaller file")
     parser.add_argument("--login", action="store_true",
                         help="open a visible browser window; sign in, then press "
                              "Enter in the terminal to start the export")
@@ -56,7 +61,7 @@ def build_parser():
     parser.add_argument("--width", type=int, default=1400, metavar="PX",
                         help="browser viewport width")
     parser.add_argument("--scale", type=int, default=2, choices=[1, 2, 3],
-                        help="screenshot scale factor (2 = Retina)")
+                        help="screenshot scale factor (2 = Retina); image mode only")
     parser.add_argument("--page-size", default="a4", choices=sorted(PAGE_SIZES),
                         help="paper size")
     parser.add_argument("--title", default=None,
@@ -109,12 +114,31 @@ def main(argv=None):
         title = args.title or driver.title or url
         log(f"  title: {title}")
 
+        date_str = datetime.date.today().strftime("%Y/%m/%d")
+        if args.mode == "text":
+            try:
+                n_pages = print_to_pdf(
+                    driver, out_path,
+                    width=args.width,
+                    page_size=args.page_size,
+                    title=title,
+                    url=url,
+                    date_str=date_str,
+                    with_header=not args.no_header,
+                    with_footer=not args.no_footer,
+                )
+            except RuntimeError as e:
+                log(f"error: {e}")
+                return 1
+            log(f"Saved: {out_path} ({n_pages} pages)" if n_pages else f"Saved: {out_path}")
+            return 0
+
         full_img = capture_full_page(driver, width=args.width, scale=args.scale)
         pages = paginate(
             full_img,
             title=title,
             url=url,
-            date_str=datetime.date.today().strftime("%Y/%m/%d"),
+            date_str=date_str,
             page_size=args.page_size,
             with_header=not args.no_header,
             with_footer=not args.no_footer,

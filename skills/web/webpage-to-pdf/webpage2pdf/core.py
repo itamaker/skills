@@ -1,7 +1,9 @@
 """Capture, stitch and paginate: the rendering pipeline behind webpage2pdf."""
 
 import base64
+import html
 import io
+import re
 import sys
 import time
 
@@ -20,6 +22,14 @@ PAGE_SIZES = {
     "letter": (216, 279),
     "legal": (216, 356),
 }
+
+# Paper sizes in inches for Chrome's printToPDF, and the margin kept on every side
+_PRINT_INCHES = {
+    "a4": (8.27, 11.69),
+    "letter": (8.5, 11.0),
+    "legal": (8.5, 14.0),
+}
+_PRINT_MARGIN_IN = 0.4
 
 # Reference width all layout metrics are designed against; actual metrics are
 # scaled proportionally so any --width/--scale combination keeps the same look.
@@ -204,3 +214,52 @@ def save_pdf(pages, out_path, page_size="a4"):
     pw_mm, _ = PAGE_SIZES[page_size]
     dpi = pages[0].width / (pw_mm / 25.4)
     pages[0].save(out_path, "PDF", resolution=dpi, save_all=True, append_images=pages[1:])
+
+
+def _print_template(left, right, margin_in):
+    """One header/footer line for printToPDF: `left` ellipsised, `right` kept whole."""
+    return (
+        f'<div style="font-size:8px;font-family:sans-serif;color:#333;width:100%;'
+        f'padding:0 {margin_in}in;display:flex;justify-content:space-between;gap:12px;">'
+        f'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{left}</span>'
+        f'<span style="white-space:nowrap;">{right}</span></div>'
+    )
+
+
+def print_to_pdf(driver, out_path, width, page_size, title, url, date_str,
+                 with_header=True, with_footer=True):
+    """Write a vector PDF with Chrome's own printToPDF; returns the page count (or None)."""
+    paper_w, paper_h = _PRINT_INCHES[page_size]
+    margin = _PRINT_MARGIN_IN
+    # printToPDF lays the page out at paper width; scaling by printable-width / --width
+    # makes the layout width equal --width, so responsive sites keep the same breakpoint.
+    scale = min(2.0, max(0.1, (paper_w - 2 * margin) * 96 / width))
+    log(f"  print scale: {scale:.3f}")
+
+    driver.execute_cdp_cmd("Emulation.setEmulatedMedia", {"media": "screen"})
+    empty = "<span></span>"
+    header = _print_template(html.escape(title), html.escape(date_str), margin) if with_header else empty
+    footer = _print_template(
+        html.escape(url),
+        '<span class="pageNumber"></span> / <span class="totalPages"></span>',
+        margin,
+    ) if with_footer else empty
+    try:
+        result = driver.execute_cdp_cmd("Page.printToPDF", {
+            "printBackground": True,
+            "paperWidth": paper_w, "paperHeight": paper_h,
+            "marginTop": margin, "marginBottom": margin,
+            "marginLeft": margin, "marginRight": margin,
+            "scale": scale,
+            "displayHeaderFooter": with_header or with_footer,
+            "headerTemplate": header, "footerTemplate": footer,
+        })
+    except Exception as e:
+        raise RuntimeError(
+            f"Chrome printToPDF failed ({e}); if the browser is headed, "
+            "rerun without --headed/--login"
+        ) from e
+    data = base64.b64decode(result["data"])
+    with open(out_path, "wb") as f:
+        f.write(data)
+    return len(re.findall(rb"/Type\s*/Page(?![A-Za-z])", data)) or None

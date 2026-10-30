@@ -1,3 +1,3 @@
-"""webpage2pdf — pixel-perfect webpage to paginated PDF, powered by Chrome screenshots."""
+"""webpage2pdf — webpage to paginated PDF, powered by headless Chrome (screenshot or print engine)."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
