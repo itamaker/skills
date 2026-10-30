@@ -1,50 +1,44 @@
 ---
 name: datasetlint
-description: Audit JSONL train/eval datasets with the datasetlint CLI. Use when checking for duplicates, train/eval leakage, label conflicts, missing IDs or empty fields, or producing a strict pass/fail report for CI.
+description: Audit train/eval JSONL datasets with the datasetlint CLI: duplicates, word-overlap near-duplicates, train/eval leakage, label conflicts, missing IDs, empty fields. Use when checking an eval set for leakage or gating CI on dataset issues.
 ---
 
 # datasetlint
 
-`datasetlint` is a Go CLI that scans a pair of JSONL dataset files (train + eval) for quality, overlap, and semantic duplication issues before they quietly corrupt training or benchmark results. Prefer the `scan` subcommand for scripted/agent use — it is non-interactive and scriptable, unlike the default Bubble Tea TUI.
+Rows are JSON objects with string fields `id`, `input`, `output`, `label` (all optional; a non-string value is a decode error). Only `input` drives duplicate, overlap and conflict checks. Samples in `examples/`, flags and report schema in `references/REFERENCE.md`.
 
-## Workflow
+## Get the binary
 
-1. Resolve the binary.
-   - Check `command -v datasetlint`. If it's on PATH (e.g. via `brew install itamaker/tap/datasetlint`), use it directly.
-   - Otherwise build from source in the tool's repository (github.com/itamaker/datasetlint-skill): `go build -o dist/datasetlint .` (or `make build`), then invoke `./dist/datasetlint`.
+`brew install itamaker/tap/datasetlint`, a release binary from github.com/itamaker/datasetlint-skill, or `go build -o datasetlint .` in a clone of that repo.
 
-2. Confirm the input shape. Each JSONL line is one JSON object with string fields `id`, `input`, `output`, `label` (only `input` and `output` are meaningfully compared; `id` and `label` are optional but drive missing-ID and label-conflict checks). See `examples/train.jsonl` and `examples/eval.jsonl` for real, minimal samples.
+Bare `datasetlint` opens an interactive TUI that hangs an agent shell; always pass a subcommand. There is no `-h` or `--version`: run `datasetlint x` (invalid subcommand) for usage, `datasetlint scan -h` for flags.
 
-3. Run the baseline scan. Both `-train` and `-eval` are required flags — there is no single-file mode:
-   ```bash
-   datasetlint scan -train path/to/train.jsonl -eval path/to/eval.jsonl
-   ```
-   This prints, per split: row count, missing-ID count, empty-input/empty-output counts, duplicate-input count, near-duplicate pair count, label-conflict count, label distribution, and input/output token-length avg + p95. It also prints cross-split literal overlap and cross-split semantic overlap counts (train/eval leakage signals).
+## Run
 
-4. For machine-readable output (CI gates, further parsing), add `-json`. This emits the full report as JSON (`train`, `eval`, `overlap_count`, `overlap_examples`, `semantic_overlap_count`, `semantic_overlap_samples` — see `references/REFERENCE.md` for the full field list).
+```bash
+datasetlint scan -train train.jsonl -eval eval.jsonl [-json] [-strict] [-semantic-threshold 0.6] [-max-samples 5]
+```
 
-5. Tune sensitivity if the defaults over- or under-flag:
-   - `-semantic-threshold <0..1>` (default `0.6`): Jaccard token-set similarity cutoff used for near-duplicate and semantic-leakage detection. Lower it to catch more borderline paraphrases; raise it to reduce false positives.
-   - `-max-samples <n>` (default `5`): caps how many example strings/pairs are printed per issue category (does not affect the *counts*, only how many samples are shown).
+Both files are required. Use `-json` to see duplicate, near-duplicate and conflict samples; text output lists only literal-overlap examples and the first semantic one.
 
-6. Gate CI or agent decisions on pass/fail with `-strict`: the process exits `1` if any issue was found (missing IDs, empty fields, duplicates, near-duplicates, or label conflicts in either split, or any train/eval overlap), and `0` if the dataset is clean. Without `-strict`, exit code is `0` for any successfully parsed scan; malformed JSONL (bad line, unreadable file) always exits `1` regardless of `-strict`.
+## Reading the result
 
-7. Interpret results: nonzero `duplicate_inputs` / `near_duplicate_pairs` means redundant rows within one split; nonzero `overlap_count` / `semantic_overlap_count` means eval rows leak into train (or vice versa) — the most serious finding, since it inflates eval metrics; nonzero `label_conflicts` means near-identical inputs were given different labels, a likely annotation error.
+- `overlap_count` > 0: identical inputs (case and whitespace folded) sit in train and eval, so eval scores are inflated. Remove them from train, or from eval when the repeat is unintended, and rescan.
+- `semantic_overlap_count` > 0: cross-split pairs with Jaccard word-set similarity >= threshold (counted per pair). Read `semantic_overlap_samples` before deleting anything. Templated prompts that share boilerplate flood this count: raise `-semantic-threshold` toward 0.8. Lower it to 0.4-0.5 to catch looser paraphrase.
+- `duplicate_inputs` counts distinct repeated inputs within a split (not extra rows); `near_duplicate_pairs` counts similar non-identical pairs. Dedupe, or keep repeats that carry different outputs on purpose.
+- `label_conflicts` counts same or near-identical inputs whose labels differ within one split. Adjudicate each conflict sample and fix the label.
+- `missing_id`, `empty_input`, `empty_output`: fix at the source.
+- `length_stats` counts words, not model tokens. Compare train against eval for distribution shift.
 
-8. Auditing a single file with no train/eval split: `-train` and `-eval` are both mandatory, so pass the same file to both flags. In that mode ignore `overlap_count`/`semantic_overlap_count` (a file trivially "overlaps" with itself) and focus only on that split's own `duplicate_inputs`, `near_duplicate_pairs`, `label_conflicts`, `missing_id`, and empty-field counts.
+## Limits
 
-## Prompt Patterns
+- Similarity is Jaccard over lowercase word sets (words of 3+ characters): no embeddings, so order, negation and synonyms are invisible. "The model is not safe to deploy" matches "The model is safe to deploy" at 0.8, a shuffled sentence scores 1.0, and a translation scores 0.
+- Only `input` is compared. Same output with different inputs, and label disagreement across train and eval, go unreported.
+- Samples are the first pairs found in row order, so they can omit the strongest pair; the counts are exact.
+- Pair search grows roughly with the square of row count when rows share common words (5,000 train + 500 eval rows took about 11 s).
 
-- "Audit my train and eval JSONL files for leakage."
-- "Check these datasets for duplicate examples."
-- "Does my eval set overlap with the training data?"
-- "Find label conflicts in this dataset."
-- "Run datasetlint on train.jsonl and eval.jsonl."
-- "Give me a strict pass/fail check for CI on this dataset."
-- "Are there near-duplicate prompts between train and eval?"
-- "Summarize label counts and length stats for this dataset."
+## Gating
 
-## Resources
+`-strict` exits 1 if any count above is nonzero (a missing `id` included) and cannot be narrowed; for a specific gate, read the field from `-json`. Without `-strict` a parsed scan exits 0. Exit 1 also means an unreadable file or bad line (names the line); exit 2 is a usage error.
 
-- `examples/train.jsonl`, `examples/eval.jsonl`: minimal real sample pair (in this skill's `examples/` folder) showing the required JSONL shape and exercising duplicate-input, missing-ID, and empty-output cases.
-- `references/REFERENCE.md`: full flag reference, JSON report schema, and exit-code semantics.
+To audit one file, pass it as both `-train` and `-eval`, ignore the two overlap counts, and read the split fields; `-strict` then always fails.
