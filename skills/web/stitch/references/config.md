@@ -70,8 +70,8 @@ scripts/run.sh save-config --config ./.stitch.json --api-key "$STITCH_API_KEY"
 ## Saving
 
 - Precedence is CLI flag, environment variable, config value, built-in default.
-- `save-config` and `--save-config` write the fully resolved result (secrets included) to the loaded config file, or to `<cwd>/.stitch.json` when none was loaded. `--save-config` works on any command and saves after it succeeds.
-- A saved `runtime.sdkPackage` keeps its value: a config written under an earlier release still pins that release (for example `@google/stitch-sdk@0.3.5`) until you change it.
+- `save-config` and `--save-config` write the fully resolved result (secrets included) to the loaded config file, or to `<cwd>/.stitch.json` when none was loaded. `--save-config` works on `show-config` and the SDK-backed commands and saves after the command succeeds.
+- A saved `runtime.sdkPackage` keeps its value: a config written under an earlier release still pins that release (for example `@google/stitch-sdk@0.3.5`) until you change it. An exact version in `--sdk-package`, `STITCH_SKILL_SDK_PACKAGE` or this field reinstalls when the cached copy is another version; tags such as `@next` keep the cached copy (add `--force-install` to refresh).
 
 ## Auth fields
 

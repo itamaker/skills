@@ -1,6 +1,6 @@
 # Stitch SDK Runner Reference
 
-The options, enums and SDK surface behind `scripts/run.sh`. Written against `@google/stitch-sdk` 0.4.0, the runner's default pin; [0.3.x to 0.4.0 differences](#03x-to-040-differences) lists what changed. `scripts/run.sh --help` lists the commands and `scripts/run.sh <command> --help` the flags of each.
+The options, enums and SDK surface behind `scripts/run.sh`. Written against `@google/stitch-sdk` 0.4.0, the runner's default pin; [0.3.x to 0.4.0 differences](#03x-to-040-differences) lists what changed. `scripts/run.sh --help` lists the commands and `scripts/run.sh <command> --help` the flags of each. Official SDK docs: `stitch.withgoogle.com/docs`.
 
 ## Common options
 
@@ -45,7 +45,7 @@ screen.variants(prompt, {
 ## Design system options
 
 - `--design-system-file`: JSON file describing the design system payload
-- `--asset-id`: ID of an existing design system on the project
+- `--asset-id`: ID of an existing design system on the project (`9` or `assets/9`; the runner strips the `assets/` prefix because 0.4.0, unlike 0.3.5, would send it twice)
 - `--selections-file`: JSON file with `[{ id, sourceScreen }]` selected screen instances
 
 ## Official SDK methods behind the runner
@@ -222,6 +222,7 @@ Verified by diffing the published 0.3.5 and 0.4.0 packages and driving both agai
 - `getHtmlUrl()` / `getImageUrl()` are the URL accessors; `getHtml()` / `getImage()` remain as deprecated aliases that return URLs. The 0.4.0 README describes `getHtml()` as returning content, but the shipped code returns the URL; use `readHtml()` for content.
 - `Project`, `Screen` and `DesignSystem` constructors are `@deprecated`; use `stitch.project(id)`, `project.screen(id)`, `project.designSystem(id)`. `Project.data` is typed `ProjectData`.
 - New: `readHtml()` / `readImage()`, `uploadDesignMd`, `createDesignSystemFromDesignMd`, tools `delete_project`, `upload_design_md`, `create_design_system_from_design_md`, the `@google/stitch-sdk/tools` entry, client options `retry` and `entityCache`, and `STITCH_BASE_URL` / `STITCH_PROJECT_ID` environment variables.
+- `project.designSystem(id)` keeps an `assets/` prefix in the id (0.3.5 strips it), so `update` and `apply` need the bare id.
 - `stitch.toolMap` no longer exists on the singleton; import `toolMap` instead.
 - 0.4.0 declares `ai`, `@google/adk` and `@google/genai` as optional peer dependencies; importing `@google/stitch-sdk/ai` without `ai` throws, and `/adk` without `@google/adk` throws. The runner imports only the main entry.
 - Removed exports: `buildFifeSuffix`, `StitchProxyConfigSchema`.

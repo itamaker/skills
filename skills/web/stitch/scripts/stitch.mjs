@@ -433,11 +433,24 @@ async function readPrompt(values) {
   fail("Missing prompt. Pass --prompt or --prompt-file.");
 }
 
+async function installedSdkVersion(packageJsonPath) {
+  try {
+    return JSON.parse(await fsp.readFile(packageJsonPath, "utf8")).version;
+  } catch {
+    return undefined;
+  }
+}
+
 async function ensureSdkInstalled(settings, { forceInstall = false } = {}) {
   const runtimeDir = settings.runtime.dir;
   const packageJsonPath = path.join(runtimeDir, "node_modules", "@google", "stitch-sdk", "package.json");
   if (!forceInstall && (await pathExists(packageJsonPath))) {
-    return packageJsonPath;
+    // An exact pin (`@x.y.z`) reinstalls when the cached copy is another version;
+    // tags and ranges (`@next`, `@^0.4`) keep whatever is installed.
+    const pinned = settings.runtime.sdkPackage.match(/@(\d+\.\d+\.\d+(?:[-+][\w.-]+)?)$/)?.[1];
+    if (!pinned || (await installedSdkVersion(packageJsonPath)) === pinned) {
+      return packageJsonPath;
+    }
   }
 
   await fsp.mkdir(runtimeDir, { recursive: true });
@@ -527,6 +540,11 @@ function normalizeScreen(screen, extras = {}) {
     data,
     ...extras,
   };
+}
+
+// SDK 0.3.x strips the "assets/" resource prefix from a design system id; 0.4.0 does not.
+function normalizeAssetId(rawId) {
+  return String(rawId).replace(/^assets\//, "");
 }
 
 function normalizeDesignSystem(designSystem, extras = {}) {
@@ -657,6 +675,7 @@ async function commandInstallSdk(values, config) {
     {
       runtimeDir: settings.runtime.dir,
       sdkPackage: settings.runtime.sdkPackage,
+      installedVersion: await installedSdkVersion(packageJsonPath),
       packageJsonPath,
     },
     Boolean(values.json),
@@ -890,7 +909,7 @@ async function commandUpdateDesignSystem(values, config) {
   const { client, sdk } = await createSdk(settings);
   try {
     const project = sdk.project(projectId);
-    const designSystem = project.designSystem(values["asset-id"]);
+    const designSystem = project.designSystem(normalizeAssetId(values["asset-id"]));
     const updated = await designSystem.update(designSystemPayload);
     await maybePersistResolvedConfig(values, config, settings);
     printOutput(normalizeDesignSystem(updated), Boolean(values.json));
@@ -916,7 +935,7 @@ async function commandApplyDesignSystem(values, config) {
   const { client, sdk } = await createSdk(settings);
   try {
     const project = sdk.project(projectId);
-    const designSystem = project.designSystem(values["asset-id"]);
+    const designSystem = project.designSystem(normalizeAssetId(values["asset-id"]));
     const screens = await designSystem.apply(selections);
     await maybePersistResolvedConfig(values, config, settings);
     printOutput(toScreenList(screens).map(screen => normalizeScreen(screen)), Boolean(values.json));
