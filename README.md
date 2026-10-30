@@ -66,7 +66,7 @@ Command-line tools and skills for building and evaluating LLM agents: authoring 
 
 - **[skillforge](./skills/agent-tooling/skillforge/SKILL.md)**: Draft and scaffold OpenClaw-ready skills from briefs, tool catalogs and JSON specs.
 - **[runlens](./skills/agent-tooling/runlens/SKILL.md)**: Analyze agent and tool JSONL traces for failures, flaky tools, latency outliers and token usage.
-- **[ragcheck](./skills/agent-tooling/ragcheck/SKILL.md)**: Evaluate retrieval and RAG runs offline with Precision@k, Recall@k, MAP, nDCG and an answer judge.
+- **[ragcheck](./skills/agent-tooling/ragcheck/SKILL.md)**: Evaluate retrieval and RAG runs offline with Precision@k, Recall@k, MAP, nDCG and a lexical answer check.
 - **[promptdeck](./skills/agent-tooling/promptdeck/SKILL.md)**: Render, batch and rank prompt variants from templates, JSON variables and experiment matrices.
 - **[datasetlint](./skills/agent-tooling/datasetlint/SKILL.md)**: Audit JSONL datasets for duplicates, train/eval leakage and label conflicts.
 
