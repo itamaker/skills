@@ -1,13 +1,18 @@
 ---
 name: webpage-to-pdf
-description: Export a live webpage to a pixel-perfect, paginated PDF via headless Chrome screenshots (what is on screen, not print CSS). Use when the user wants to save, archive, or print a URL or article as PDF, including pages behind a login. Not for editing or extracting text from existing PDFs.
+description: Export a live webpage to a paginated PDF with headless Chrome, as pixel-exact screenshots or (--mode text) selectable, searchable text. Use when the user wants to save, archive, or print a URL or article as PDF, including pages behind a login.
 allowed-tools: Bash, Read
-argument-hint: "<url> [output.pdf] [--login|--headed|--wait N|--page-size a4|letter|legal]"
+argument-hint: "<url> [output.pdf] [--mode image|text|--login|--headed|--wait N|--page-size a4|letter|legal]"
 ---
 
 # webpage-to-pdf
 
-Captures a page exactly as Chrome renders it — not through the print pipeline — then paginates the screenshot into an A4/Letter/Legal PDF with a title/date header and a URL/page-number footer. Output is a WYSIWYG image-based PDF: text is not selectable. If the user needs selectable/searchable text, this is the wrong tool — point them at Chrome's own Print to PDF instead.
+Exports a page as an A4/Letter/Legal PDF with a title/date header and a URL/page-number footer, in one of two modes:
+
+| `--mode` | Output | Pick when |
+|---|---|---|
+| `image` (default) | Chrome screenshot sliced into pages; pixel-exact, text not selectable, about 1 MB per page | The page must look exactly as it does on screen |
+| `text` | Chrome's print engine; vector PDF with selectable, searchable text, typically 10x or more smaller | The user will search, copy, quote or have an agent read the PDF, or wants a small archive |
 
 This skill is self-contained: the CLI's source ships inside this skill folder, so it works with nothing else installed beyond Google Chrome and the two Python dependencies below.
 
@@ -32,7 +37,8 @@ Requires Google Chrome; Selenium Manager fetches the matching chromedriver autom
 | US Letter / Legal paper | `--page-size letter` / `--page-size legal` |
 | Clean pages, no header/footer | `--no-header --no-footer` |
 | Narrow / mobile layout | `--width 800` |
-| Selectable/searchable text needed | wrong tool — use Chrome's Print to PDF |
+| Selectable/searchable text, small file | `--mode text` |
+| Larger type in `--mode text` | lower `--width` (e.g. `--width 900`) |
 
 **Page requires signing in first**: `--login` opens a visible Chrome window and blocks on a terminal prompt waiting for Enter — that can't be driven through a non-interactive command. Ask the user to run it themselves, e.g. suggest they type `!webpage2pdf URL --login` so they can sign in and press Enter. For repeat visits to the same site, `--user-data-dir DIR` reuses that signed-in session headlessly afterward.
 
@@ -44,8 +50,8 @@ Full flag reference, ready-made recipes, and troubleshooting live in [references
 webpage2pdf <url> [-o output.pdf] [flags...]
 ```
 
-Without `-o`, the output filename is derived from the URL. Done when the command exits 0 and prints `Saved: <path> (<N> pages)`.
+Without `-o`, the output filename is derived from the URL. Done when the command exits 0 and prints `Saved: <path>`.
 
 ## 4. Report and recover
 
-Tell the user the output path and page count. If the command fails or errors, match the error text against [references/REFERENCE.md](references/REFERENCE.md)'s Troubleshooting table, apply the fix, and retry once before asking the user for guidance.
+Tell the user the output path and, when the `Saved:` line gives it, the page count. If the command fails or errors, match the error text against [references/REFERENCE.md](references/REFERENCE.md)'s Troubleshooting table, apply the fix, and retry once before asking the user for guidance.
