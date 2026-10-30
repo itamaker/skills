@@ -1,3 +1,4 @@
 interface:
-  display_name: "runlens"
+  display_name: "Runlens"
   short_description: "Analyze agent and tool JSONL traces"
+  default_prompt: "Use $runlens to summarize this agent trace, or diagnose its failures, flaky tools, and latency outliers."

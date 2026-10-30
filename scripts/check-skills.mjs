@@ -62,8 +62,14 @@ for (const bucket of [...PROMOTED, ...OTHER]) {
     const fm = frontmatter(`${dir}/SKILL.md`);
     if (fm.name !== name) fail(`${dir}/SKILL.md: frontmatter name "${fm.name}" must equal the folder name "${name}"`);
     if (!fm.description) fail(`${dir}/SKILL.md: missing description`);
-    else if (fm.description.length > MAX_DESCRIPTION)
-      fail(`${dir}/SKILL.md: description is ${fm.description.length} characters (max ${MAX_DESCRIPTION})`);
+    else {
+      if (fm.description.length > MAX_DESCRIPTION)
+        fail(`${dir}/SKILL.md: description is ${fm.description.length} characters (max ${MAX_DESCRIPTION})`);
+      // A plain YAML scalar cannot hold ": " or " #", nor start with an indicator; real YAML loaders reject the file.
+      const plain = !/^["'>|]/.test(fm.description);
+      if (plain && (/: |\s#/.test(fm.description) || /^[\[\]{}*&!%@`,?-]/.test(fm.description)))
+        fail(`${dir}/SKILL.md: description is not valid as an unquoted YAML value (contains ": " or " #", or starts with an indicator); wrap it in double quotes`);
+    }
     if (!existsSync(join(ROOT, dir, "agents", "openai.yaml"))) fail(`${dir}: missing agents/openai.yaml`);
 
     const bucketEntry = bucketEntries.get(name);

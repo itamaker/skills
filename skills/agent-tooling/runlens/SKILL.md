@@ -1,50 +1,42 @@
 ---
 name: runlens
-description: Analyze JSONL agent and tool execution traces with the runlens CLI. Use when summarizing success rate, latency, and token usage, diagnosing why a run failed, finding flaky tools or latency outliers, or clustering recurring errors.
+description: Summarize and diagnose JSONL agent/tool execution traces with the runlens CLI (success rate, p95 latency, tokens, flaky tools, error clusters). Use when a trace needs a health report, or when finding why a run failed, which tool is flaky or slow.
 ---
 
 # runlens
 
-`runlens` is a Go CLI that reads a JSONL log of agent/tool execution events and reports success rate, latency (avg/p95), token usage, flaky tools, recurring error clusters, hot tool-to-tool transitions, and outlier events. Prefer invoking the `runlens` binary directly over re-implementing JSONL parsing or aggregation by hand — it already computes p95 latency, per-tool failure rates, and outlier classification consistently.
+Deterministic stats over a JSONL trace (one event per line: `tool`, `latency_ms`, `tokens_in`, `tokens_out`, `success`, optional `agent`, `error`). Run it instead of hand-aggregating.
 
-## Workflow
+## Get the binary
 
-1. Make sure `runlens` is available.
-   - Install with `brew install itamaker/tap/runlens`, download a release binary from the Releases page of github.com/itamaker/runlens-skill, or build from a source checkout with `go build -o runlens .`.
-   - Do not invoke bare `runlens` with no arguments — that launches an interactive Bubble Tea TUI and will hang a non-interactive/agent shell. Always use an explicit subcommand.
+`brew install itamaker/tap/runlens`, a release binary from github.com/itamaker/runlens-skill, or `go build -o runlens .` in a clone of that repo.
 
-2. Identify the input trace file.
-   - It must be JSONL (one JSON object per line). Each event has: `timestamp`, `agent`, `tool`, `latency_ms`, `tokens_in`, `tokens_out`, `success` (bool), and an optional `error` string.
-   - `examples/run.jsonl` in this skill's folder is a good shape reference if the user hasn't supplied their own trace file.
+Bare `runlens` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Builds after v0.3.0 answer `runlens -h` and `runlens --version` (exit 0), and `runlens summary -h` lists the flags. With v0.3.0 these exit 2, which is expected: run `runlens x` (an invalid subcommand) for usage.
 
-3. Choose the subcommand based on what the user wants to know.
-   - `runlens summary -input <path>`: aggregate stats only — total runs, success rate, avg/p95 latency, total tokens in/out, and a per-tool run/failure/latency breakdown. Use this for a quick health check or token/latency report.
-   - `runlens diagnose -input <path>`: everything `summary` produces, plus flaky-tool detection, error clustering, top tool-to-tool transitions, and outlier events. Use this whenever the user asks "why did this fail," "what's flaky," or "what's slow."
+## Run
 
-4. Add `-json` to either subcommand when the output needs to be parsed programmatically or fed into another step (e.g. summarizing across multiple trace files, or building a table). Omit it for a direct human-readable report.
-   - Example: `runlens diagnose -input run.jsonl -json`
+```bash
+runlens summary  -input trace.jsonl [-json]   # totals and per-tool breakdown
+runlens diagnose -input trace.jsonl [-json]   # summary + flaky tools, error clusters, transitions, outliers
+```
 
-5. Read the report.
-   - `summary` output: `Runs`, `Success rate`, `Latency avg/p95`, `Tokens in/out`, then a `Tool usage` line per tool.
-   - `diagnose` output adds up to four extra sections, only printed when non-empty: `Flaky tools`, `Error clusters`, `Top transitions` (top 5), `Outliers` (top 5). See `references/REFERENCE.md` for the exact JSON schema and the thresholds used to classify flaky tools and outliers.
+Start with `diagnose`. `examples/run.jsonl` shows the event shape.
 
-6. Handle errors.
-   - Missing `-input`: exits 2 with `-input is required`.
-   - Unreadable/missing file or malformed JSONL line: exits 1 with a `open log file: ...` or `decode JSONL line N: ...` message — report the line number back to the user so they can fix their trace.
-   - Unknown subcommand: exits 2 and prints usage; there is no dedicated `--help`/`-h` flag on the top-level command.
+## Reading the result
 
-## Prompt Patterns
+- `Success rate` below 100%: read `Error clusters` first. Each line is `signature: count (tools)`; fix the biggest cluster first.
+- `Flaky tools` lists a tool with failure rate >= 20% or tool p95 above 1.25x the global p95. Inspect that tool's calls and error text before changing the agent.
+- `Outliers` shows `#N`, the Nth event (1-based, blank lines excluded). Reason `failed`, `tool-latency-outlier` (>= mean + 2 stddev for its tool) or `global-latency-outlier` (above global p95). Open those events in the trace.
+- `Top transitions` is the 5 most common consecutive `tool -> tool` pairs; a repeated `x -> x` pair signals a retry loop.
+- `Tokens in/out` are totals only; divide by `Runs` for a per-call figure.
 
-- "Summarize this agent run log."
-- "Why is my agent trace failing so much?"
-- "Which tools are flaky in this run.jsonl?"
-- "Find the latency outliers in this trace."
-- "Cluster the errors in this JSONL log."
-- "How many tokens did this evaluation run use?"
-- "Give me a JSON report of this trace for a dashboard."
-- "What tool call sequences show up most before failures?"
+## Limits
 
-## Resources
+- Order is file order: `timestamp` is ignored and `agent` only labels outliers. Sort or split interleaved concurrent agents first, or transitions mix them.
+- A missing `success` field counts as a failure.
+- Small samples mislead: one failed call makes a tool 100% flaky. Latency outliers need at least 12 events (below that p95 is the max, so nothing exceeds it).
+- Outliers list only the 5 slowest, so fast failures drop out; use `Error clusters` for the failure inventory.
+- Clusters group by exact lowercased text; IDs or timestamps inside messages split one cause into many.
+- Cost, retries, and tool arguments are outside the schema; wrong-but-successful calls are invisible.
 
-- `examples/run.jsonl` (in this skill's folder): example trace file matching the expected JSONL shape.
-- `references/REFERENCE.md`: full JSON output schema for `summary`/`diagnose`, and the exact thresholds used to flag flaky tools and outliers.
+Exit 0 ok, 1 unreadable file or bad line (message names the line), 2 usage error. Fields, schema and thresholds: `references/REFERENCE.md`.

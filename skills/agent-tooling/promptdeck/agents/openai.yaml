@@ -1,3 +1,4 @@
 interface:
-  display_name: "promptdeck"
+  display_name: "Promptdeck"
   short_description: "Render, batch and rank prompt variants"
+  default_prompt: "Use $promptdeck to render a prompt template, expand an experiment matrix into variants, or rank scored variants."

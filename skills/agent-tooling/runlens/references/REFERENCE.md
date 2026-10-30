@@ -17,7 +17,7 @@ Both `summary` and `diagnose` use Go's `flag` package:
 - `-input string` (required): path to a JSONL log file.
 - `-json` (optional, default false): emit machine-readable JSON instead of the human-readable report.
 
-There is no top-level `--help`/`-h`/`--version` flag. Any unrecognized first argument prints a short usage block and exits with status 2.
+In v0.3.0 there is no top-level `--help`/`-h`/`--version`: any unrecognized first argument prints `unknown subcommand "x"` to stderr, a short usage block to stdout, and exits with status 2, and `runlens summary -h` (and `diagnose -h`) prints the flag list and exits 2. Builds after v0.3.0 (itamaker/runlens-skill#3) accept `-h`, `-help`, `--help`, `help` and `--version`/`version` (stdout, exit 0), send an unknown subcommand's usage to stderr (exit 2), and make `runlens summary -h` exit 0 with the flags on stdout.
 
 ## Input event shape (JSONL, one object per line)
 
@@ -34,7 +34,7 @@ There is no top-level `--help`/`-h`/`--version` flag. Any unrecognized first arg
 }
 ```
 
-`error` and `agent` are optional strings; everything else is required for meaningful stats. Blank lines in the file are skipped.
+`error` and `agent` are optional strings; everything else is required for meaningful stats. `timestamp` is not used: events are processed in file order. A missing `success` field decodes as `false` (counts as a failure). Only truly empty lines are skipped; a whitespace-only line fails with `decode JSONL line N`, and a line longer than 64 KB fails with `scan log file: bufio.Scanner: token too long` (exit 1). An empty file reports `Runs: 0` and exits 0.
 
 ## `summary -json` output schema
 
@@ -96,13 +96,15 @@ Adds four sections on top of the `summary` object (each field is omitted from JS
 A tool is reported in `flaky_tools` when either is true:
 
 - `failure_rate >= 0.2` (at least 20% of its runs failed), OR
-- its per-tool p95 latency exceeds `1.25 * global_p95_latency_ms`.
+- its per-tool p95 latency is strictly greater than `int(1.25 * global_p95_latency_ms)`.
+
+The global p95 covers all tools together, so a high-volume fast tool lowers the bar for slower ones. A tool with a single failed run is reported at 100%.
 
 Sorted by failure rate descending, then p95 latency descending.
 
 ### Error clustering
 
-Errors are grouped by a normalized signature: the `error` string is lowercased, trimmed, and internal whitespace collapsed. Events with `success: false` but an empty `error` field are clustered under the signature `"unspecified failure"`. Sorted by count descending, then signature ascending.
+Errors are grouped by a normalized signature: the `error` string is lowercased, trimmed, and internal whitespace collapsed. Every event with `success: false` or a non-empty `error` is clustered (so a successful event that carries an `error` string counts too); a failure with an empty `error` goes under `"unspecified failure"`. Sorted by count descending, then signature ascending.
 
 ### Transitions
 
@@ -113,8 +115,10 @@ Counts consecutive `tool -> tool` pairs across the event sequence (only when bot
 An event is an outlier if any of these hold, and `reason` lists all that apply (comma-joined):
 
 - `failed`: `success` is `false`.
-- `tool-latency-outlier`: the event's latency is at or above that tool's `mean + 2*stddev` latency, AND also exceeds the global p95.
-- `global-latency-outlier`: only assigned when neither of the above already applied, and the event's latency exceeds the global p95 (and global p95 > 0).
+- `tool-latency-outlier`: the event's latency is at or above that tool's `mean + 2*stddev` latency (population stddev), AND also exceeds the global p95.
+- `global-latency-outlier`: only assigned when no other reason applied (not `failed`, not `tool-latency-outlier`), and the event's latency exceeds the global p95 (and global p95 > 0).
+
+The global p95 is `sorted[round(0.95*(n-1))]`, so with fewer than 12 events it equals the maximum and no event can exceed it (verified: 11 events with a 10x spike report no outlier, 12 do). `index` is the 1-based event number (blank lines excluded), not the file line number.
 
 Sorted by latency descending, then original index ascending, and **truncated to the top 5**.
 

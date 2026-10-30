@@ -1,6 +1,6 @@
 # ragcheck reference
 
-Full CLI, JSON schema, and metric reference for the `ragcheck` binary. Load this only when you need field-level or formula-level detail beyond what `SKILL.md` covers.
+Full CLI, JSON schema, and metric reference for the `ragcheck` binary. Load this only when you need field-level or formula-level detail beyond what `SKILL.md` covers. In v0.3.0 `ragcheck score -h` and `ragcheck judge -h` print the flag list and exit 2, and there is no `--version`; builds after v0.3.0 (itamaker/ragcheck-skill#3) accept `-h`, `-help`, `--help`, `help` and `--version`/`version` (stdout, exit 0), send an unknown subcommand's usage to stderr (exit 2), and make `ragcheck score -h` exit 0 with the flags on stdout.
 
 ## CLI
 
@@ -30,17 +30,17 @@ ragcheck judge -input <path> [-json]
 | `-input` | yes | — | Path to a judge input JSON file |
 | `-json` | no | `false` | Emit machine-readable JSON instead of text |
 
-Text output prints averaged `Queries`, `Answer relevance`, `Context relevance`, `Groundedness`, `Reference coverage`, then one line per query with per-query relevance/groundedness and any unsupported tokens. `-json` emits a `JudgeReport`: `queries`, `answer_relevance`, `context_relevance`, `groundedness`, `reference_coverage`, and a `results[]` array of per-query `JudgeResult` objects (`query_id`, `answer_relevance`, `context_relevance`, `groundedness`, `reference_coverage`, `unsupported_tokens[]`, `missing_context_hints[]`).
+Text output prints averaged `Queries`, `Answer relevance`, `Context relevance`, `Groundedness`, `Reference coverage`, then one line per query with answer relevance, groundedness and any unsupported tokens. Per-query `context_relevance`, `reference_coverage` and `missing_context_hints` appear only with `-json`. `-json` emits a `JudgeReport`: `queries`, `answer_relevance`, `context_relevance`, `groundedness`, `reference_coverage`, and a `results[]` array of per-query `JudgeResult` objects (`query_id`, `answer_relevance`, `context_relevance`, `groundedness`, `reference_coverage`, `unsupported_tokens[]`, `missing_context_hints[]`).
 
 ### No-argument / TUI
 
-`ragcheck` (no args), `ragcheck tui`, and `ragcheck interactive` all launch the same Bubble Tea interactive UI. Any other unrecognized first argument prints usage to stderr and exits `2`.
+`ragcheck` (no args), `ragcheck tui`, and `ragcheck interactive` all launch the same Bubble Tea interactive UI. Any other unrecognized first argument prints `unknown subcommand "x"` to stderr, a usage block to stdout, and exits `2`.
 
 ### Exit codes
 
 - `0`: success.
 - `1`: runtime error (e.g. file not found, invalid JSON) — message printed to stderr.
-- `2`: usage error (missing required flag, unknown subcommand, flag parse failure) — message printed to stderr.
+- `2`: usage error (missing required flag, unknown subcommand, flag parse failure, `-h`) — message printed to stderr.
 
 ## JSON schemas
 
@@ -70,7 +70,7 @@ Array of retrieval results, one per query, ranked best-first.
 ```
 
 - `query_id` (string, required): should match a qrels entry; queries in `-run` with no corresponding qrels entry are ignored, and qrels entries with no matching run count toward `missing_runs`.
-- `results` (string[], required): ranked document IDs, best match first. Only the first `k` are considered.
+- `results` (string[], required): ranked document IDs, best match first. Only the first `k` are considered. Dedupe the list first: a repeated ID is counted as a repeated hit (`results: [d1,d1,d1]` for one relevant doc gives per-query Precision 1.0 and Recall 3.0; verified).
 
 ### judge input file (`-input`)
 
@@ -101,10 +101,10 @@ Array of RAG records to judge.
 
 ### Retrieval metrics (`score`), computed per query then averaged
 
-All metrics only look at the top `k` entries of `results`.
+All metrics only look at the top `k` entries of `results` and are means over every qrels entry (`queries`). Documents absent from qrels grade as 0 (non-relevant). `-k` of 0 or below returns an all-zero report with `queries: 0`.
 
 - **Precision@k**: `hits / k`, where `hits` = count of top-k results with grade `> 0`.
-- **Recall@k**: `hits / relevantCount`, where `relevantCount` = total documents with grade `> 0` in qrels (0 if none — query excluded from the average's numerator contribution).
+- **Recall@k**: `hits / relevantCount`, where `relevantCount` = total documents with grade `> 0` in qrels. A query with `relevantCount` 0 adds 0 to the sum but still counts in the denominator (the mean is over all qrels queries).
 - **HitRate@k**: `1` if `hits > 0` else `0`, averaged across queries.
 - **MRR@k**: `1 / rank` of the first relevant hit within top-k (0 if no hit).
 - **MAP@k**: average precision within top-k — sum of `(running hit count / rank)` at each relevant hit, divided by `min(relevantCount, k)`.
@@ -113,13 +113,17 @@ All metrics only look at the top `k` entries of `results`.
 
 ### Judge metrics (`judge`), computed per record then averaged
 
-All four scores are token-overlap ratios: tokenize both sides (lowercase, letters/digits only, tokens shorter than 3 chars dropped, a small stopword list removed), then `matched-unique-source-tokens / unique-source-tokens`.
+All four scores are token-overlap ratios: tokenize both sides (lowercase, split on anything that is not a letter or digit, tokens shorter than 3 bytes dropped, stopwords removed; no stemming), then `matched-unique-source-tokens / unique-source-tokens`.
 
 - **answer_relevance**: overlap of `answer` tokens against `question` tokens.
 - **context_relevance**: overlap of joined `contexts` tokens against `question` tokens.
 - **groundedness**: overlap of `answer` tokens against joined `contexts` tokens.
 - **reference_coverage**: overlap of `answer` tokens against `reference` tokens (`0` if `reference` is empty/omitted).
-- **unsupported_tokens**: up to 5 sorted `answer` tokens not found in `contexts` tokens (answer content the contexts don't back up).
-- **missing_context_hints**: up to 5 sorted `reference` tokens not found in `contexts` tokens (reference content the contexts don't cover).
+- **unsupported_tokens**: the first 5 (alphabetically) unique `answer` tokens not found in `contexts` tokens.
+- **missing_context_hints**: the first 5 (alphabetically) unique `reference` tokens not found in `contexts` tokens.
 
-This is a lightweight, dependency-free heuristic judge (no LLM call) — treat its scores as a fast offline signal, not a substitute for human or LLM-graded evaluation.
+Stopwords: the, and, for, with, that, this, from, into, are, was, were, have, has, had, your, about, then, than, when, what, why, how, using, used, their, there, will.
+
+Direction matters: each ratio is the share of the *first* text's unique tokens present in the second, so `answer_relevance` and `context_relevance` shrink as the answer or contexts grow, `reference_coverage` ignores reference content the answer omits, and an answer equal to the question scores `answer_relevance` 1.0. Numbers under 3 characters are dropped (`42` and `24` both vanish), and text without spaces (CJK) tokenizes into one token per run of characters. Verified by running `judge` on crafted records.
+
+This is a lexical heuristic (no LLM, no embeddings): the scores order runs on the same questions and surface answer words to verify by hand; they do not establish correctness.

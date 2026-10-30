@@ -1,6 +1,6 @@
 Skills are organized into bucket folders under `skills/`:
 
-- `agent-tooling/`: building and evaluating LLM agents (skillforge, runlens, ragcheck, promptdeck, datasetlint)
+- `agent-tooling/`: building and evaluating LLM agents (runlens, ragcheck, promptdeck, datasetlint)
 - `web/`: web pages and web-based design tools (webpage-to-pdf, stitch, remote-browser)
 - `dev/`: everyday development workflow (go-workspace-skill)
 - `in-progress/`: beta: public on purpose, feedback wanted, not shipped in the plugin
@@ -15,7 +15,7 @@ The `description` in each `SKILL.md` is a separate, model-facing trigger descrip
 
 Every `SKILL.md` has an `agents/openai.yaml` beside it. Install commands are copied verbatim from `.agents/install-block.md`. Run `node scripts/check-skills.mjs` after adding, renaming or moving a skill, and `claude plugin validate . --strict` after touching `.claude-plugin/`.
 
-Five skills wrap a Go command-line tool (skillforge, runlens, ragcheck, promptdeck, datasetlint). The tool's source, release config and Homebrew formula stay in its own repository (`itamaker/<name>-skill`); only the skill folder lives here. Do not copy tool source into this repo.
+Four skills wrap a Go command-line tool (runlens, ragcheck, promptdeck, datasetlint). The tool's source, release config and Homebrew formula stay in its own repository (`itamaker/<name>-skill`); only the skill folder lives here. Do not copy tool source into this repo.
 
 To link every skill outside `deprecated/` and `misc/` into the local harness directories (`~/.claude/skills`, `~/.agents/skills`), run `scripts/link-skills.sh`. Each entry is a symlink into this repo, so a `git pull` keeps installed skills current.
 

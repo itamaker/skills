@@ -21,7 +21,6 @@
     "browser"
   ],
   "skills": [
-    "./skills/agent-tooling/skillforge",
     "./skills/agent-tooling/runlens",
     "./skills/agent-tooling/ragcheck",
     "./skills/agent-tooling/promptdeck",

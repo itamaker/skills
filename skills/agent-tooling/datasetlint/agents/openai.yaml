@@ -1,3 +1,4 @@
 interface:
-  display_name: "datasetlint"
+  display_name: "Datasetlint"
   short_description: "Audit JSONL datasets for quality and leakage"
+  default_prompt: "Use $datasetlint to audit train and eval JSONL files for duplicates, train/eval leakage, label conflicts, or missing IDs."
