@@ -1,58 +1,47 @@
 ---
 name: promptdeck
-description: Render, batch, and rank prompt variants with the promptdeck CLI from templates and JSON variables. Use when rendering a prompt from a template, expanding an experiment matrix into variants, or ranking scored variants to find the best combination.
+description: Render prompt templates (Go text/template plus JSON vars), expand a variable matrix into numbered variants, and rank scored variants with the promptdeck CLI. Use when generating prompt-experiment variants or picking the best-scoring one.
 ---
 
 # promptdeck
 
-`promptdeck` is a Go CLI that renders Go text-template prompts from JSON variables, expands them into Cartesian experiment matrices, and ranks variants against a scores file. It has three real subcommands (`render`, `matrix`, `optimize`) plus an interactive Bubble Tea TUI. Prefer invoking the subcommands directly — they are the same commands the TUI shells out to internally.
+Prompt-experiment bookkeeping. `promptdeck` renders text and ranks scores you supply; it calls no model and computes no scores. Samples in `examples/`, flag and schema tables in `references/REFERENCE.md`.
 
-## Workflow
+## Get the binary
 
-1. Make sure `promptdeck` is available.
-   - If installed (`brew install itamaker/tap/promptdeck`), call it directly: `promptdeck <subcommand> ...`.
-   - If working from a source checkout of the tool's repository (github.com/itamaker/promptdeck-skill), build once with `go build -o promptdeck .` and call `./promptdeck`, or run ad hoc with `go run . <subcommand> ...`.
+`brew install itamaker/tap/promptdeck`, a release binary from github.com/itamaker/promptdeck-skill, or `go build -o promptdeck .` in a clone of that repo.
 
-2. Render one prompt from a template and a JSON vars file:
-   - `promptdeck render -template <template.tmpl> -vars <vars.json> [-out <file>]`
-   - `-vars` accepts either a single JSON object (one rendered prompt) or a JSON array of objects (each rendered, joined with a `\n---\n` separator).
-   - Without `-out`, the rendered body prints to stdout. With `-out`, it is written to that file instead (silently overwriting it) and nothing prints to stdout.
+Bare `promptdeck` opens an interactive TUI that hangs an agent shell; always pass a subcommand. There is no `-h` or `--version`: run `promptdeck x` (invalid subcommand) for usage, `promptdeck matrix -h` for flags.
 
-3. Batch-render an experiment matrix into every variable combination:
-   - `promptdeck matrix -template <template.tmpl> -matrix <matrix.json> [-out-dir <dir>] [-ext .txt] [-manifest <manifest.json>]`
-   - `-matrix` is a JSON object whose values are string arrays; every combination (Cartesian product) becomes one candidate, numbered `001`, `002`, ... in sorted-key order.
-   - Without `-out-dir`, all rendered prompts print to stdout separated by `\n---\n`. With `-out-dir`, each candidate is written as `<index><ext>` (default extension `.txt`) inside that directory instead, and a `wrote N prompts to <dir>` summary prints to stdout.
-   - Add `-manifest <path>` (combinable with either output mode) to also write a JSON array of `{index, vars, prompt}` objects — this is the input `optimize` expects to pair with a scores file.
+## Experiment loop
 
-4. Rank scored prompt variants and surface the best-performing factors:
-   - `promptdeck optimize -template <template.tmpl> -matrix <matrix.json> -scores <scores.json> [-top N] [-out <file>] [-json]`
-   - `optimize` rebuilds the same candidates `matrix` would produce from `-template`/`-matrix`, then joins them by `index` against `-scores` (a JSON array of `{index, score, notes?}`). Candidates with no matching score entry are dropped from ranking.
-   - Default `-top` is 3. Human-readable output (default) prints candidate/scored counts, the best candidate, the top-N ranked list, and per-factor average scores. Pass `-json` to emit the same data as a single `OptimizationReport` JSON object instead.
-   - Pass `-out <file>` to also write the single best-scoring prompt body to that file (silently overwriting it).
+```bash
+promptdeck render   -template t.tmpl -vars vars.json [-out f]        # one prompt (object) or several joined by ---
+promptdeck matrix   -template t.tmpl -matrix matrix.json -out-dir prompts -manifest manifest.json
+# score every prompts/<index>.txt yourself, write scores.json: [{"index":"001","score":0.72,"notes":"..."}]
+promptdeck optimize -template t.tmpl -matrix matrix.json -scores scores.json [-top N] [-out best.txt] [-json]
+```
 
-5. Interactive mode: running `promptdeck` with no arguments (or `promptdeck tui` / `promptdeck interactive`) launches a Bubble Tea terminal UI that walks through the same three actions with prompted fields. It requires a real terminal — don't use it for scripted/agent-driven invocations; use the direct subcommands above instead.
+`matrix` takes the Cartesian product of all value lists, numbered `001`, `002`, ... in sorted-key order. `optimize` rebuilds the candidates from the same template and matrix and joins your scores by `index`; it does not read the manifest, which exists to help you score.
 
-For the full flag list, JSON schema details, template function reference, and exit codes, see `references/REFERENCE.md`.
+## Reading `optimize`
+
+- `Scored` must equal the number of rows in scores.json. Lower means some indices matched no candidate, usually because the matrix or template changed after scoring.
+- `Best prompt` is the highest score (ties go to the lower index); `-out` writes its body to a file.
+- `Best factors` are mean scores per `variable=value` with the count of scored candidates in parentheses. Compare values of the same variable. A count of 1 or 2 is an anecdote, and a value shared by every scored candidate carries no signal. In the example, 4 of 16 variants are scored, so `artifact`, `audience` and `depth` all show 0.782 (4).
+- To trust a factor, score the full matrix or at least a few variants per value, then rerun. Only the top 8 factors print.
+
+## Limits
+
+- A template key missing from the vars renders as `<no value>` with exit 0. Grep rendered output for `<no value>` after any template or matrix edit.
+- Matrix values must be strings; a number is a decode error (exit 1). An `index` key in the matrix is overwritten by the generated index. An empty matrix `{}` renders one prompt with only `index` set.
+- Indices are positional. Adding, removing or reordering a matrix value renumbers candidates, and old scores then attach to different prompts without any warning.
+- Combination counts multiply (3 keys of 5 values is 125 files); count them before running `matrix -out-dir`.
+- `-top` of 0 or below becomes 3.
 
 ## Safety Rules
 
-- `-out`, `-out-dir`, and `-manifest` overwrite existing files without confirmation or backup.
-- `matrix -out-dir` file names come only from that run's own sequential index (`001.txt`, `002.txt`, ...). Re-running with a different template or matrix against the same `-out-dir` silently overwrites unrelated prior output with no warning — confirm the target directory is empty or expendable before reusing it.
+- `-out`, `-out-dir` and `-manifest` overwrite files without confirmation, and `-out-dir` never deletes: a run with fewer candidates leaves earlier `NNN.txt` files in place. Use an empty directory per matrix.
+- `optimize -out` writes nothing, with exit 0, when no score matched.
 
-## Prompt Patterns
-
-- "Render examples/review.tmpl with examples/vars.json and show me the output."
-- "Generate every prompt variant from this experiment matrix."
-- "Batch-render this template against the matrix and write a manifest I can score later."
-- "Write all the rendered variants out as individual .txt files."
-- "Which tone and risk combination scored best in this experiment?"
-- "Rank the top 5 scored prompt variants as JSON."
-- "Optimize this prompt template using the scores file and save the winning prompt to a file."
-
-## Resources
-
-- `examples/review.tmpl`: example Go text template (`{{.artifact}}`, `{{.audience}}`, `{{.tone}}`, `{{.depth}}`, `{{.risk}}`).
-- `examples/vars.json`: example single-object input for `render`.
-- `examples/matrix.json`: example matrix input (object of string arrays) for `matrix` and `optimize`.
-- `examples/scores.json`: example scored-run input for `optimize`.
-- `references/REFERENCE.md`: full flag reference per subcommand, JSON schema for vars/matrix/scores/manifest, template functions, and exit codes.
+Exit 0 ok, 1 template/JSON/file error, 2 missing required flag or unknown subcommand.

@@ -5,8 +5,8 @@ Verified against the `render`, `matrix`, and `optimize` subcommands in `internal
 ## Global behavior
 
 - `promptdeck` with no arguments launches the TUI (see SKILL.md step 5).
-- `promptdeck <unknown>` prints usage to stderr and exits `2`.
-- There is no `-h`/`--help` flag; passing one is treated as an unknown subcommand (usage on stderr, exit `2`).
+- `promptdeck <unknown>` prints `unknown subcommand "x"` to stderr, a usage block to stdout, and exits `2`.
+- There is no top-level `-h`/`--help` flag; passing one is treated as an unknown subcommand (exit `2`). `promptdeck render -h` (also `matrix -h`, `optimize -h`) prints that subcommand's flags and exits `2`.
 - There is no `version` subcommand.
 
 ## `render`
@@ -44,7 +44,7 @@ promptdeck matrix -template <path> -matrix <path> [-out-dir <dir>] [-ext <ext>] 
 - Candidate generation: the Cartesian product of all matrix value arrays, in **sorted key order**, is expanded into one candidate per combination. Candidates are numbered `index = "001", "002", ...` in generation order; an empty matrix (`{}`) produces exactly one candidate with `index = "001"` and no other vars.
 - Each candidate's `vars` map includes its own `index` key alongside the matrix keys — if the matrix JSON itself defines an `"index"` array, it is silently overwritten by the generated sequential index.
 - Without `-out-dir`: all rendered prompt bodies print to stdout, separated by `\n---\n`.
-- With `-out-dir`: directory is created if missing (`0o755`); one file per candidate is written as `<index><ext>` (e.g. `001.txt`); on success prints `wrote <N> prompts to <dir>` to stdout. Existing files with the same name are overwritten.
+- With `-out-dir`: directory is created if missing (`0o755`); one file per candidate is written as `<index><ext>` (e.g. `001.txt`); on success prints `wrote <N> prompts to <dir>` to stdout. Existing files with the same name are overwritten; other files already in the directory are left untouched (verified: a stale `016.txt` survives a 4-candidate run).
 - `-manifest` can be combined with either output mode; it writes `json.MarshalIndent` of the full candidate list (`[]PromptCandidate`), pretty-printed with a trailing newline.
 - Errors reading/parsing the template or matrix, or writing output: message to stderr, exit `1`.
 
@@ -65,7 +65,7 @@ promptdeck optimize -template <path> -matrix <path> -scores <path> [-top N] [-ou
 
 - Missing any of `-template`/`-matrix`/`-scores`: `template, matrix, and scores are required` to stderr, exit `2`.
 - `optimize` recomputes candidates the same way `matrix` does (same Cartesian expansion, same `index` numbering) — it does **not** read a manifest file directly. The `-matrix` passed to `optimize` must be the one that produced the `index` values referenced in `-scores`.
-- Candidates whose `index` has no matching entry in `-scores` are dropped from ranking (excluded from `scored`, `best`, `top`, and factor effects).
+- Candidates whose `index` has no matching entry in `-scores` are dropped from ranking (excluded from `scored`, `best`, `top`, and factor effects). `factor_effects` therefore reflect only the scored subset: with a partial or unbalanced scoring set, a value's average is confounded by the other variables.
 - Ranking sorts by `score` descending, then `index` ascending as a tiebreak.
 - `factor_effects` averages `score` per individual `variable=value` pair (excluding the `index` key) across all scored candidates that used it, sorted by average score descending (ties broken by variable, then value), capped at 8 entries.
 - Human-readable output (default): `Candidates: N`, `Scored: N`, `Best prompt: #<index> score=<3dp>`, a `Top prompts:` list, and a `Best factors:` list.
@@ -85,7 +85,8 @@ promptdeck optimize -template <path> -matrix <path> -scores <path> [-top N] [-ou
 
 - Templates are standard Go `text/template` files, parsed with `template.ParseFiles`.
 - Registered template functions: `join` (`strings.Join`), `upper` (`strings.ToUpper`), `lower` (`strings.ToLower`), `title` (`strings.Title`).
-- Variables are referenced as `{{.key}}`, where `key` matches a field in the vars object or matrix.
+- Variables are referenced as `{{.key}}`, where `key` matches a field in the vars object or matrix. A key that is absent from the vars renders as the literal text `<no value>` and the run still exits `0` (verified: `{{.nme}}` typo). Passing an absent key to a function (`{{upper .name}}`) is an error instead: `render template: ... invalid value; expected string`, exit `1`.
+- Every matrix candidate also exposes `{{.index}}` (`001`, `002`, ...).
 
 ## JSON schemas
 
@@ -105,7 +106,7 @@ or a JSON array of such objects (rendered and concatenated with `\n---\n`).
   "risk": ["low", "medium"]
 }
 ```
-An empty array for a key still produces one candidate with that key set to `""`.
+An empty array for a key still produces one candidate with that key set to `""`. Values must be strings: a number such as `{"n":[1,2]}` fails with `decode matrix: json: cannot unmarshal number ...` (exit `1`).
 
 **`scores.json`** (for `optimize`) — array of score records, matched to matrix candidates by `index`:
 ```json
@@ -113,6 +114,6 @@ An empty array for a key still produces one candidate with that key set to `""`.
   {"index": "001", "score": 0.72, "notes": "Good structure, but too soft on blocking issues."}
 ]
 ```
-`notes` is optional; an `extra` object of `string -> number` is accepted on the input type but is not currently used in ranking or output.
+`index` must be a JSON string (`"001"`; the number `1` fails with `decode scores`, exit `1`). If two rows share an `index`, the last wins. Rows whose `index` matches no candidate are ignored silently, and because indices are positional (see `matrix`), editing the matrix renumbers candidates and re-attaches old scores to different prompts. `notes` is optional; an `extra` object of `string -> number` is accepted on the input type but is not currently used in ranking or output.
 
 **manifest output** (`-manifest` on `matrix`) — array of `{index, vars, prompt}`, identical in shape to the `top`/`best` candidate objects `optimize -json` emits (minus `score`/`notes`).
