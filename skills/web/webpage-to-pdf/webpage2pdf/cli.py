@@ -129,6 +129,8 @@ def main(argv=None):
                 )
             except RuntimeError as e:
                 log(f"error: {e}")
+                if not headless:
+                    log("hint: rerun without --headed/--login; some Chrome builds only print to PDF when headless")
                 return 1
             log(f"Saved: {out_path} ({n_pages} pages)" if n_pages else f"Saved: {out_path}")
             return 0

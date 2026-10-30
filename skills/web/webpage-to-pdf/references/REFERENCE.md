@@ -55,9 +55,9 @@ Then `--mode image` (default):
 
 Or `--mode text`:
 
-3. Emulates the `screen` media type, so the PDF shows the on-screen styles rather than print CSS.
+3. Emulates the `screen` media type, so a site's `@media print` rules do not apply and the PDF shows the on-screen styles.
 4. Calls CDP `Page.printToPDF` with backgrounds on, 0.4in margins, and Chrome header/footer templates (title and date on top; URL and `pageNumber / totalPages` below). `--no-header` / `--no-footer` blank the matching template.
-5. Sets the print `scale` to printable paper width in CSS px divided by `--width` (clamped to Chrome's 0.1-2 range), so the layout is computed at `--width` and responsive sites keep the same breakpoint as in `image` mode. A4 at the default 1400 gives scale 0.51; `--width 900` gives 0.83.
+5. Sets the print `scale` to printable paper width in CSS px divided by `--width` (clamped to Chrome's 0.1-2 range), so the layout is computed at `--width` and responsive sites keep the same breakpoint as in `image` mode. A4 at the default 1400 gives scale 0.51; `--width 900` gives 0.80.
 
 ## Troubleshooting
 

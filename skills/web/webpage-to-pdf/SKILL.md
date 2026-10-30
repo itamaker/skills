@@ -11,7 +11,7 @@ Exports a page as an A4/Letter/Legal PDF with a title/date header and a URL/page
 
 | `--mode` | Output | Pick when |
 |---|---|---|
-| `image` (default) | Chrome screenshot sliced into pages; pixel-exact, text not selectable, about 1 MB per page | The page must look exactly as it does on screen |
+| `image` (default) | Chrome screenshot sliced into pages; pixel-exact, text not selectable, 1-2 MB per page | The page must look exactly as it does on screen |
 | `text` | Chrome's print engine; vector PDF with selectable, searchable text, typically 10x or more smaller | The user will search, copy, quote or have an agent read the PDF, or wants a small archive |
 
 This skill is self-contained: the CLI's source ships inside this skill folder, so it works with nothing else installed beyond Google Chrome and the two Python dependencies below.

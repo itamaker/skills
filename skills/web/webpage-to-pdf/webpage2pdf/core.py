@@ -256,8 +256,7 @@ def print_to_pdf(driver, out_path, width, page_size, title, url, date_str,
         })
     except Exception as e:
         raise RuntimeError(
-            f"Chrome printToPDF failed ({e}); if the browser is headed, "
-            "rerun without --headed/--login"
+            f"Chrome printToPDF failed ({e})"
         ) from e
     data = base64.b64decode(result["data"])
     with open(out_path, "wb") as f:
