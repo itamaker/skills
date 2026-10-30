@@ -16,7 +16,14 @@ const CONFIG_ENV_VAR = "STITCH_SKILL_CONFIG";
 const DEFAULT_CONFIG_NAMES = [".stitch.json", "stitch.json"];
 const DEFAULT_BASE_URL = "https://stitch.googleapis.com/mcp";
 const DEFAULT_TIMEOUT_MS = 300000;
-const DEFAULT_SDK_PACKAGE = "@google/stitch-sdk@0.3.5";
+const DEFAULT_SDK_PACKAGE = "@google/stitch-sdk@0.4.0";
+const KNOWN_MODEL_IDS = [
+  "GEMINI_3_8_FLASH",
+  "GEMINI_3_5_FLASH_LITE",
+  "GEMINI_3_PRO",
+  "GEMINI_3_FLASH",
+  "GEMINI_3_1_PRO",
+];
 const DEFAULT_RUNTIME_DIR_TEMPLATE = "~/.cache/itamaker-skills/stitch-sdk";
 const DEFAULT_RUNTIME_DIR = path.join(
   process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache"),
@@ -265,6 +272,7 @@ function resolvedSettings(configData, cliValues) {
         undefined,
       baseUrl:
         cliValues["base-url"] ||
+        process.env.STITCH_BASE_URL ||
         process.env.STITCH_HOST ||
         auth.baseUrl ||
         DEFAULT_BASE_URL,
@@ -455,17 +463,10 @@ async function loadSdkModules(settings) {
   const packageDir = path.dirname(packageJsonPath);
   const packageJson = JSON.parse(await fsp.readFile(packageJsonPath, "utf8"));
 
+  // Load only the main entry: "@google/stitch-sdk/ai" needs the optional peer
+  // dependency "ai" (SDK 0.4.0 throws without it) and the runner never uses it.
   const mainEntry = path.join(packageDir, packageJson.exports["."].import);
-  const aiEntry = packageJson.exports["./ai"]
-    ? path.join(packageDir, packageJson.exports["./ai"].import)
-    : null;
-
-  const sdk = await import(pathToFileURL(mainEntry).href);
-  const ai = aiEntry ? await import(pathToFileURL(aiEntry).href) : {};
-  return {
-    ...sdk,
-    ...ai,
-  };
+  return await import(pathToFileURL(mainEntry).href);
 }
 
 function createClientConfig(settings) {
@@ -540,6 +541,26 @@ function normalizeDesignSystem(designSystem, extras = {}) {
   };
 }
 
+// SDK 0.4.0 returns a Generation (all screens in .screens, first screen proxied);
+// SDK 0.3.x returns a Screen or Screen[]. Normalize both to an array of screens.
+function toScreenList(result) {
+  if (Array.isArray(result)) {
+    return result;
+  }
+  if (result && Array.isArray(result.screens)) {
+    return [...result.screens];
+  }
+  return [result];
+}
+
+// 0.4.0 names the URL accessors getHtmlUrl/getImageUrl (getHtml/getImage are
+// deprecated aliases); 0.3.x only has getHtml/getImage.
+function screenExportUrls(screen) {
+  const getHtml = screen.getHtmlUrl ?? screen.getHtml;
+  const getImage = screen.getImageUrl ?? screen.getImage;
+  return Promise.all([getHtml.call(screen), getImage.call(screen)]);
+}
+
 async function readJsonInput(values, { fileKey, jsonKey, label }) {
   const inlineValue = values[jsonKey];
   const fileValue = values[fileKey];
@@ -594,7 +615,7 @@ async function downloadUrlToFile(url, outputPath) {
 
 async function getScreenWithExports(project, screenId) {
   const screen = await project.getScreen(screenId);
-  const [htmlUrl, imageUrl] = await Promise.all([screen.getHtml(), screen.getImage()]);
+  const [htmlUrl, imageUrl] = await screenExportUrls(screen);
   return normalizeScreen(screen, { htmlUrl, imageUrl });
 }
 
@@ -713,7 +734,7 @@ function generationArgs(values, settings) {
 }
 
 async function hydrateScreenResult(screen, values) {
-  const [htmlUrl, imageUrl] = await Promise.all([screen.getHtml(), screen.getImage()]);
+  const [htmlUrl, imageUrl] = await screenExportUrls(screen);
   const result = normalizeScreen(screen, { htmlUrl, imageUrl });
 
   if (values["html-out"]) {
@@ -723,6 +744,21 @@ async function hydrateScreenResult(screen, values) {
     result.imagePath = await downloadUrlToFile(imageUrl, values["image-out"]);
   }
 
+  return result;
+}
+
+// Hydrate the first screen of a generation (CLI output shape of SDK 0.3.x) and
+// list any further screens under `additionalScreens` (SDK 0.4.0 can return several).
+async function hydrateGeneration(generation, values) {
+  const [first, ...rest] = toScreenList(generation);
+  const result = await hydrateScreenResult(first, values);
+  if (rest.length > 0) {
+    result.additionalScreens = [];
+    for (const screen of rest) {
+      const [htmlUrl, imageUrl] = await screenExportUrls(screen);
+      result.additionalScreens.push(normalizeScreen(screen, { htmlUrl, imageUrl }));
+    }
+  }
   return result;
 }
 
@@ -744,8 +780,8 @@ async function commandGenerate(values, config) {
       fail("Missing --project-id. Use --create-project-title to create a project on the fly.");
     }
 
-    const screen = await project.generate(prompt, deviceType, modelId);
-    const result = await hydrateScreenResult(screen, values);
+    const generation = await project.generate(prompt, deviceType, modelId);
+    const result = await hydrateGeneration(generation, values);
     result.projectId = projectId;
     settings.defaults.projectId = projectId;
     await maybePersistResolvedConfig(values, config, settings);
@@ -769,7 +805,7 @@ async function commandEdit(values, config) {
     const screen = await project.getScreen(values["screen-id"]);
     const edited = await screen.edit(prompt, deviceType, modelId);
     await maybePersistResolvedConfig(values, config, settings);
-    printOutput(await hydrateScreenResult(edited, values), Boolean(values.json));
+    printOutput(await hydrateGeneration(edited, values), Boolean(values.json));
   } finally {
     await client.close();
   }
@@ -797,7 +833,7 @@ async function commandVariants(values, config) {
     const screen = await project.getScreen(values["screen-id"]);
     const variants = await screen.variants(prompt, variantOptions, deviceType, modelId);
     const hydrated = [];
-    for (const variant of variants) {
+    for (const variant of toScreenList(variants)) {
       hydrated.push(await hydrateScreenResult(variant, values));
     }
     await maybePersistResolvedConfig(values, config, settings);
@@ -883,7 +919,7 @@ async function commandApplyDesignSystem(values, config) {
     const designSystem = project.designSystem(values["asset-id"]);
     const screens = await designSystem.apply(selections);
     await maybePersistResolvedConfig(values, config, settings);
-    printOutput(screens.map(screen => normalizeScreen(screen)), Boolean(values.json));
+    printOutput(toScreenList(screens).map(screen => normalizeScreen(screen)), Boolean(values.json));
   } finally {
     await client.close();
   }
@@ -902,7 +938,8 @@ async function commandDownloadArtifact(values, config, kind) {
   try {
     const project = sdk.project(projectId);
     const screen = await project.getScreen(values["screen-id"]);
-    const url = kind === "html" ? await screen.getHtml() : await screen.getImage();
+    const [htmlUrl, imageUrl] = await screenExportUrls(screen);
+    const url = kind === "html" ? htmlUrl : imageUrl;
     const outputPath = await downloadUrlToFile(url, values.out);
     await maybePersistResolvedConfig(values, config, settings);
     printOutput({ url, outputPath }, Boolean(values.json));
@@ -963,11 +1000,11 @@ function commandUsage(command) {
     "get-screen":
       "stitch get-screen --project-id <id> --screen-id <id> [--include-exports] [common-options]",
     "generate":
-      "stitch generate (--project-id <id> | --create-project-title <title>) (--prompt <text> | --prompt-file <path>) [--device-type ...] [--model-id ...] [--html-out path] [--image-out path] [common-options]",
+      `stitch generate (--project-id <id> | --create-project-title <title>) (--prompt <text> | --prompt-file <path>) [--device-type ...] [--model-id ${KNOWN_MODEL_IDS.join("|")}] [--html-out path] [--image-out path] [common-options]`,
     "edit":
-      "stitch edit --project-id <id> --screen-id <id> (--prompt <text> | --prompt-file <path>) [--device-type ...] [--model-id ...] [--html-out path] [--image-out path] [common-options]",
+      `stitch edit --project-id <id> --screen-id <id> (--prompt <text> | --prompt-file <path>) [--device-type ...] [--model-id ${KNOWN_MODEL_IDS.join("|")}] [--html-out path] [--image-out path] [common-options]`,
     "variants":
-      "stitch variants --project-id <id> --screen-id <id> (--prompt <text> | --prompt-file <path>) [--variant-count n] [--creative-range ...] [--aspects a,b] [--device-type ...] [--model-id ...] [common-options]",
+      `stitch variants --project-id <id> --screen-id <id> (--prompt <text> | --prompt-file <path>) [--variant-count n] [--creative-range ...] [--aspects a,b] [--device-type ...] [--model-id ${KNOWN_MODEL_IDS.join("|")}] [common-options]`,
     "list-design-systems":
       "stitch list-design-systems --project-id <id> [common-options]",
     "create-design-system":
@@ -1198,6 +1235,13 @@ try {
   const payload = {
     error: error?.message || String(error),
   };
+  // StitchError details (for example CLARIFICATION_REQUIRED carries Stitch's question).
+  if (error?.code && typeof error.code === "string") {
+    payload.code = error.code;
+  }
+  if (error?.clarification) {
+    payload.clarification = error.clarification;
+  }
   console.error(JSON.stringify(payload, null, 2));
   process.exit(exitCode);
 }
