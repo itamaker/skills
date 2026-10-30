@@ -105,7 +105,7 @@ Reach for this instead of a live `list-tools` call when the user wants to inspec
 ## Enums
 
 - `DeviceType`: `MOBILE` | `DESKTOP` | `TABLET` | `AGNOSTIC`
-- `modelId`: `GEMINI_3_8_FLASH` | `GEMINI_3_5_FLASH_LITE` | `GEMINI_3_PRO` | `GEMINI_3_FLASH` | `GEMINI_3_1_PRO` (the 0.4.0 type declarations; 0.3.5 declares `GEMINI_3_PRO`, `GEMINI_3_FLASH`, `GEMINI_3_1_PRO`). The runner uppercases the value and passes it through unchecked, so the service decides which ids it accepts.
+- `modelId`: `GEMINI_3_8_FLASH` | `GEMINI_3_5_FLASH_LITE` | `GEMINI_3_PRO` | `GEMINI_3_FLASH` | `GEMINI_3_1_PRO` (the 0.4.0 type declarations; 0.3.5 declares `GEMINI_3_PRO`, `GEMINI_3_FLASH`, `GEMINI_3_1_PRO`). The runner defaults to `GEMINI_3_8_FLASH`, uppercases the value and passes it through unchecked, so the service decides which ids it accepts (config details: [config.md](config.md)).
 - `creativeRange`: `REFINE` | `EXPLORE` | `REIMAGINE`
 - `aspects` (variants): `LAYOUT`, `COLOR_SCHEME`, `IMAGES`, `TEXT_FONT`, `TEXT_CONTENT`
 

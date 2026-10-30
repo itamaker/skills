@@ -17,6 +17,8 @@ const DEFAULT_CONFIG_NAMES = [".stitch.json", "stitch.json"];
 const DEFAULT_BASE_URL = "https://stitch.googleapis.com/mcp";
 const DEFAULT_TIMEOUT_MS = 300000;
 const DEFAULT_SDK_PACKAGE = "@google/stitch-sdk@0.4.0";
+// Newest id in the 0.4.0 tool schema (highest-numbered, and one of the two ids its README documents).
+const DEFAULT_MODEL_ID = "GEMINI_3_8_FLASH";
 const KNOWN_MODEL_IDS = [
   "GEMINI_3_8_FLASH",
   "GEMINI_3_5_FLASH_LITE",
@@ -41,7 +43,7 @@ const DEFAULT_CONFIG_TEMPLATE = {
   defaults: {
     projectId: "",
     deviceType: "DESKTOP",
-    modelId: "GEMINI_3_PRO",
+    modelId: DEFAULT_MODEL_ID,
     variantCount: 3,
     creativeRange: "EXPLORE",
     variantAspects: ["LAYOUT", "COLOR_SCHEME"],
@@ -289,7 +291,8 @@ function resolvedSettings(configData, cliValues) {
         normalizeEnum(defaults.deviceType, "deviceType"),
       modelId:
         normalizeEnum(cliValues["model-id"], "modelId") ||
-        normalizeEnum(defaults.modelId, "modelId"),
+        normalizeEnum(defaults.modelId, "modelId") ||
+        DEFAULT_MODEL_ID,
       variantCount: cliValues["variant-count"]
         ? coercePositiveInt(cliValues["variant-count"], "variant-count")
         : defaults.variantCount

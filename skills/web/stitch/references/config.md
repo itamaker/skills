@@ -55,7 +55,7 @@ scripts/run.sh save-config --config ./.stitch.json --api-key "$STITCH_API_KEY"
   "defaults": {
     "projectId": "",
     "deviceType": "DESKTOP",
-    "modelId": "GEMINI_3_PRO",
+    "modelId": "GEMINI_3_8_FLASH",
     "variantCount": 3,
     "creativeRange": "EXPLORE",
     "variantAspects": ["LAYOUT", "COLOR_SCHEME"]
@@ -85,7 +85,7 @@ scripts/run.sh save-config --config ./.stitch.json --api-key "$STITCH_API_KEY"
 
 - `defaults.projectId`: project to use when the command does not pass `--project-id`.
 - `defaults.deviceType`: a device type (values: Enums in [mcp-sdk.md](mcp-sdk.md)).
-- `defaults.modelId`: a model id (values: Enums in [mcp-sdk.md](mcp-sdk.md)); the runner passes it through unchecked.
+- `defaults.modelId`: a model id (values: Enums in [mcp-sdk.md](mcp-sdk.md)). Defaults to `GEMINI_3_8_FLASH`, the newest id in the SDK 0.4.0 tool schema. A `modelId` already saved in a `.stitch.json` keeps its value (older `save-config` runs wrote `GEMINI_3_PRO`); `--model-id` overrides both. The runner passes the id through unchecked, and the SDK checks it only in TypeScript types, so the service decides what it accepts. SDK 0.3.5 types list only `GEMINI_3_PRO`, `GEMINI_3_FLASH` and `GEMINI_3_1_PRO` but also send any other id as is; whether the service accepts `GEMINI_3_8_FLASH` is not verified, so a user pinned to 0.3.5 who sees a model error sets `--model-id GEMINI_3_1_PRO` (or `defaults.modelId`) explicitly.
 - `defaults.variantCount`: default number of variants.
 - `defaults.creativeRange`: `REFINE`, `EXPLORE` or `REIMAGINE`.
 - `defaults.variantAspects`: list of variant aspects (values: Enums in [mcp-sdk.md](mcp-sdk.md)).

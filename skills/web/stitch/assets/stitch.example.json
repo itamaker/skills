@@ -9,7 +9,7 @@
   "defaults": {
     "projectId": "",
     "deviceType": "DESKTOP",
-    "modelId": "GEMINI_3_PRO",
+    "modelId": "GEMINI_3_8_FLASH",
     "variantCount": 3,
     "creativeRange": "EXPLORE",
     "variantAspects": [
