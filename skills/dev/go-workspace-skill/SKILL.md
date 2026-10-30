@@ -1,6 +1,6 @@
 ---
 name: go-workspace-skill
-description: Config-driven manager for a multi-repo Go workspace: sync, build, test, list and clean its repos. Use when syncing, building or testing several Go repos together, or when deleting their local checkouts.
+description: Config-driven manager for a multi-repo Go workspace that syncs, builds, tests, lists and cleans its repos. Use when syncing, building or testing several Go repos together, or when deleting their local checkouts.
 ---
 
 # Go Workspace Skill
