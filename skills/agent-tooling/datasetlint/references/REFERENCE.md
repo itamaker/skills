@@ -5,7 +5,7 @@
 - `datasetlint` (no args): launches the interactive Bubble Tea TUI. Not suitable for scripted/agent use.
 - `datasetlint tui` / `datasetlint interactive`: same TUI, explicit alias.
 - `datasetlint scan <flags>`: non-interactive scan. Use this one. `datasetlint scan -h` prints the flag list (exit 2).
-- Any other first argument prints `unknown subcommand "x"` to stderr, a usage block to stdout, and exits `2`. There is no `--help` or `--version`.
+- v0.3.0: any other first argument prints `unknown subcommand "x"` to stderr, a usage block to stdout, and exits `2`; there is no `--help` or `--version`. Builds after v0.3.0 (itamaker/datasetlint-skill#3) accept `-h`, `-help`, `--help`, `help` and `--version`/`version` (stdout, exit 0), send an unknown subcommand's usage to stderr (exit 2), and make `datasetlint scan -h` exit 0 with the flags on stdout.
 
 ## `scan` flags
 

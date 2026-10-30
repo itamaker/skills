@@ -11,7 +11,7 @@ Offline and deterministic: no network, no model calls. Inputs are JSON arrays (n
 
 `brew install itamaker/tap/ragcheck`, a release binary from github.com/itamaker/ragcheck-skill, or `go build -o ragcheck .` in a clone of that repo.
 
-Bare `ragcheck` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Usage: run `ragcheck x` (an invalid subcommand). Flags: `ragcheck score -h`. Both exit 2, which is expected; the CLI has no `--version`.
+Bare `ragcheck` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Builds after v0.3.0 answer `ragcheck -h` and `ragcheck --version` (exit 0), and `ragcheck score -h` lists the flags. With v0.3.0 these exit 2, which is expected: run `ragcheck x` (an invalid subcommand) for usage.
 
 ## Run
 

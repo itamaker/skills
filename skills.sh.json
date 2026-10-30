@@ -15,7 +15,6 @@
       "title": "Agent Tooling",
       "description": "Build and evaluate LLM agents.",
       "skills": [
-        "skillforge",
         "runlens",
         "ragcheck",
         "promptdeck",

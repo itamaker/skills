@@ -1,6 +1,6 @@
 # ragcheck reference
 
-Full CLI, JSON schema, and metric reference for the `ragcheck` binary. Load this only when you need field-level or formula-level detail beyond what `SKILL.md` covers. `ragcheck score -h` and `ragcheck judge -h` print the flag list (exit 2).
+Full CLI, JSON schema, and metric reference for the `ragcheck` binary. Load this only when you need field-level or formula-level detail beyond what `SKILL.md` covers. In v0.3.0 `ragcheck score -h` and `ragcheck judge -h` print the flag list and exit 2, and there is no `--version`; builds after v0.3.0 (itamaker/ragcheck-skill#3) accept `-h`, `-help`, `--help`, `help` and `--version`/`version` (stdout, exit 0), send an unknown subcommand's usage to stderr (exit 2), and make `ragcheck score -h` exit 0 with the flags on stdout.
 
 ## CLI
 

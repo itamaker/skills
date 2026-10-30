@@ -11,7 +11,7 @@ Deterministic stats over a JSONL trace (one event per line: `tool`, `latency_ms`
 
 `brew install itamaker/tap/runlens`, a release binary from github.com/itamaker/runlens-skill, or `go build -o runlens .` in a clone of that repo.
 
-Bare `runlens` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Usage: run `runlens x` (an invalid subcommand). Flags: `runlens summary -h`. Both exit 2, which is expected; the CLI has no `--version`.
+Bare `runlens` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Builds after v0.3.0 answer `runlens -h` and `runlens --version` (exit 0), and `runlens summary -h` lists the flags. With v0.3.0 these exit 2, which is expected: run `runlens x` (an invalid subcommand) for usage.
 
 ## Run
 

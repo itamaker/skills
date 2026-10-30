@@ -6,7 +6,7 @@ Verified against the `render`, `matrix`, and `optimize` subcommands in `internal
 
 - `promptdeck` with no arguments launches an interactive TUI that hangs a non-interactive shell.
 - `promptdeck <unknown>` prints `unknown subcommand "x"` to stderr, a usage block to stdout, and exits `2`.
-- There is no top-level `-h`/`--help` flag; passing one is treated as an unknown subcommand (exit `2`). `promptdeck render -h` (also `matrix -h`, `optimize -h`) prints that subcommand's flags and exits `2`.
+- v0.3.0 has no top-level `-h`/`--help`/`--version`; each is treated as an unknown subcommand (exit `2`), and `promptdeck render -h` (also `matrix -h`, `optimize -h`) prints that subcommand's flags and exits `2`. Builds after v0.3.0 (itamaker/promptdeck-skill#3) accept `-h`, `-help`, `--help`, `help` and `--version`/`version` (stdout, exit 0), send an unknown subcommand's usage to stderr (exit 2), and make `promptdeck matrix -h` exit 0 with the flags on stdout.
 - There is no `version` subcommand.
 
 ## `render`

@@ -11,7 +11,7 @@ Rows are JSON objects with string fields `id`, `input`, `output`, `label` (all o
 
 `brew install itamaker/tap/datasetlint`, a release binary from github.com/itamaker/datasetlint-skill, or `go build -o datasetlint .` in a clone of that repo.
 
-Bare `datasetlint` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Usage: run `datasetlint x` (an invalid subcommand). Flags: `datasetlint scan -h`. Both exit 2, which is expected; the CLI has no `--version`.
+Bare `datasetlint` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Builds after v0.3.0 answer `datasetlint -h` and `datasetlint --version` (exit 0), and `datasetlint scan -h` lists the flags. With v0.3.0 these exit 2, which is expected: run `datasetlint x` (an invalid subcommand) for usage.
 
 ## Run
 

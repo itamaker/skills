@@ -11,7 +11,7 @@ Prompt-experiment bookkeeping. `promptdeck` renders text and ranks scores you su
 
 `brew install itamaker/tap/promptdeck`, a release binary from github.com/itamaker/promptdeck-skill, or `go build -o promptdeck .` in a clone of that repo.
 
-Bare `promptdeck` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Usage: run `promptdeck x` (an invalid subcommand). Flags: `promptdeck matrix -h`. Both exit 2, which is expected; the CLI has no `--version`.
+Bare `promptdeck` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Builds after v0.3.0 answer `promptdeck -h` and `promptdeck --version` (exit 0), and `promptdeck matrix -h` lists the flags. With v0.3.0 these exit 2, which is expected: run `promptdeck x` (an invalid subcommand) for usage.
 
 ## Experiment loop
 

@@ -17,7 +17,7 @@ Both `summary` and `diagnose` use Go's `flag` package:
 - `-input string` (required): path to a JSONL log file.
 - `-json` (optional, default false): emit machine-readable JSON instead of the human-readable report.
 
-There is no top-level `--help`/`-h`/`--version` flag. Any unrecognized first argument prints `unknown subcommand "x"` to stderr, a short usage block to stdout, and exits with status 2. `runlens summary -h` (and `diagnose -h`) prints the flag list and exits 2.
+In v0.3.0 there is no top-level `--help`/`-h`/`--version`: any unrecognized first argument prints `unknown subcommand "x"` to stderr, a short usage block to stdout, and exits with status 2, and `runlens summary -h` (and `diagnose -h`) prints the flag list and exits 2. Builds after v0.3.0 (itamaker/runlens-skill#3) accept `-h`, `-help`, `--help`, `help` and `--version`/`version` (stdout, exit 0), send an unknown subcommand's usage to stderr (exit 2), and make `runlens summary -h` exit 0 with the flags on stdout.
 
 ## Input event shape (JSONL, one object per line)
 
