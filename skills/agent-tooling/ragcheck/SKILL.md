@@ -1,46 +1,49 @@
 ---
 name: ragcheck
-description: Evaluate retrieval and RAG runs offline with the ragcheck CLI. Use when scoring a run against qrels (Precision@k, Recall@k, MRR, MAP, nDCG), judging answers for groundedness or relevance, or comparing retriever configs.
+description: Score retrieval runs against qrels (P/R/HitRate/MRR/MAP/nDCG@k) and check RAG answers by lexical token overlap with the ragcheck CLI. Use when comparing retriever configs on one qrels set, or flagging answer words absent from contexts.
 ---
 
 # ragcheck
 
-`ragcheck` is a Go CLI that scores retrieval runs against qrels (query relevance judgments) and judges RAG answer quality offline — no notebooks, no external eval service, no network calls. It ships two direct subcommands (`score`, `judge`) plus an interactive Bubble Tea TUI when invoked with no arguments.
+Offline and deterministic: no network, no model calls. Inputs are JSON arrays (not JSONL); schemas in `references/REFERENCE.md`, samples in `examples/`.
 
-## Workflow
+## Get the binary
 
-1. Confirm `ragcheck` is available. If not installed (`brew install itamaker/tap/ragcheck` or a GitHub release binary), and you have the tool's source checked out (github.com/itamaker/ragcheck-skill), build it locally with `go build -o ragcheck .` or run subcommands via `go run . <subcommand> ...`.
+`brew install itamaker/tap/ragcheck`, a release binary from github.com/itamaker/ragcheck-skill, or `go build -o ragcheck .` in a clone of that repo.
 
-2. To score a retrieval run against ground-truth relevance judgments:
-   - Ensure you have a qrels file (array of `{query_id, relevant[]}` or `{query_id, grades{doc_id: grade}}`) and a run file (array of `{query_id, results[]}`, ranked document IDs) that share `query_id` values.
-   - Run `ragcheck score -qrels <qrels.json> -run <run.json> -k <N>` (`-k` defaults to 5).
-   - Add `-json` for machine-readable output when you need to parse or diff the numbers programmatically.
-   - Output includes: query count, missing-run count (qrels with no matching run), and Precision@k, Recall@k, HitRate@k, MRR@k, MAP@k, nDCG@k.
+Bare `ragcheck` opens an interactive TUI that hangs an agent shell; always pass a subcommand. There is no `-h` or `--version`: run `ragcheck x` (invalid subcommand) for usage, `ragcheck score -h` for flags.
 
-3. To judge RAG answer quality offline (no qrels needed):
-   - Build a judge input file: an array of `{query_id, question, answer, contexts[], reference?}` records (`reference` is optional).
-   - Run `ragcheck judge -input <judge.json>`, optionally with `-json`.
-   - Output includes per-query and averaged answer relevance, context relevance, groundedness, and reference coverage, plus any unsupported answer tokens (answer content not backed by the retrieved contexts) and missing-context hints (reference content absent from contexts).
+## Run
 
-4. To compare retrieval configs (e.g. two chunking strategies or rerankers), run `ragcheck score` once per candidate `-run` file against the *same* `-qrels` file and the same `-k`, then diff the metrics — there is no built-in multi-run comparison mode, so run it multiple times and compare the printed/JSON numbers yourself.
+```bash
+ragcheck score -qrels qrels.json -run run.json -k 5 [-json]   # retrieval metrics
+ragcheck judge -input judge.json [-json]                      # lexical answer check; per-query hints need -json
+```
 
-5. Interactive/manual exploration: running `ragcheck` with no arguments (or `ragcheck tui` / `ragcheck interactive`) launches a Bubble Tea terminal UI with the same score/judge actions. This requires a real terminal — prefer the direct `score`/`judge` subcommands above when running from a non-interactive agent shell.
+Compare retriever configs by running `score` once per `-run` file with the same `-qrels` and `-k`, then diffing the numbers.
 
-6. For the full qrels/run/judge JSON field reference, metric formulas, and CLI flag/exit-code details, see `references/REFERENCE.md`.
+## Reading `score`
 
-## Prompt Patterns
+- All metrics are means over every query in qrels, so a query with no run entry (`Missing runs`) or no relevant docs counts as 0. Fix `Missing runs` > 0 before comparing.
+- `HitRate@k` low: relevant docs never reach the top k; look at retrieval itself (index, chunking, query).
+- `HitRate@k` high but `MRR@k` or `nDCG@k` low: relevant docs appear but ranked low; try a reranker or scoring changes.
+- `Recall@k` well below `HitRate@k`: only some relevant docs are found; raise `-k` or improve coverage. `Precision@k` is capped at relevant/k, so judge it relative to another run.
+- The tool defines no pass/fail thresholds; compare run against run.
 
-- "Score this retrieval run against the qrels at k=10."
-- "What's the Precision@5 and nDCG@5 for this run?"
-- "Judge these RAG answers for groundedness and relevance."
-- "Compare these two retriever configs using the same qrels file."
-- "Check whether this answer is grounded in its retrieved context."
-- "Run ragcheck on my qrels.json and run.json."
-- "Evaluate retrieval quality offline without spinning up Python eval tooling."
+## Reading `judge`
 
-## Resources
+`judge` is a lexical heuristic (lowercased word overlap, no stemming, no embeddings, no LLM). Every score is the share of unique answer/context words found in another text, so each number moves with wording, not with correctness.
 
-- `examples/qrels.json`: sample qrels file (binary relevance via `relevant[]`).
-- `examples/run.json`: sample retrieval run file matching the qrels' `query_id`s.
-- `examples/judge.json`: sample judge input with question/answer/reference/contexts.
-- `references/REFERENCE.md`: full JSON schemas, CLI flags, exit codes, and metric definitions.
+- `groundedness` (answer words found in contexts): the useful signal. Read `unsupported_tokens` (first 5 alphabetically, not the most important) for answer words to verify by hand.
+- `reference_coverage` is answer words found in the reference, so an answer that omits reference content can still score 1.0.
+- `answer_relevance` (answer words found in the question) and `context_relevance` (context words found in the question) drop as answers or contexts get longer, and an answer that repeats the question scores 1.0. The bundled example scores 0.225 and 0.113 on reasonable answers; use them only to compare runs on the same questions.
+- `missing_context_hints` (reference words absent from contexts) point at facts retrieval failed to bring.
+
+## Limits
+
+- `score` treats unjudged docs as non-relevant, so a new retriever's valid hits missing from qrels lower its score.
+- `score` counts a doc ID repeated in `results` as a repeated hit, which can push Recall above 1; dedupe `results` first.
+- `-k` 0 or below prints all-zero metrics with `Queries: 0`; `grades` overrides `relevant` when both are set.
+- `judge` misses paraphrase (`slower` vs `slow`), negation, and numbers under 3 characters (`42` vs `24` ground to 1.0). Text without spaces (CJK) becomes one word per run, so scores are all or nothing. Use human or LLM grading for correctness.
+
+Exit 0 ok, 1 unreadable or invalid JSON, 2 usage error.

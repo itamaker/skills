@@ -1,3 +1,4 @@
 interface:
-  display_name: "ragcheck"
-  short_description: "Evaluate retrieval and RAG runs offline"
+  display_name: "Ragcheck"
+  short_description: "Score retrieval runs and check RAG answers offline"
+  default_prompt: "Use $ragcheck to score a retrieval run against qrels, compare retriever configs, or flag answer words unsupported by their contexts."
