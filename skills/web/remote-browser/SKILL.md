@@ -77,7 +77,7 @@ Run `npx --yes cf@latest auth whoami` (`--yes` skips the npx download prompt; `c
 WORKER_TOKEN='<token>' scripts/deploy.sh <name>
 ```
 
-Add `FORCE=1` only to update an existing deployment. Exit codes: `2` not logged in (step 2 again), `3` name taken in the Cloudflare account (ask for another), `4` bad input (fix and rerun). The script installs dependencies, generates types and typechecks, deploys with the token as a secret, and records the instance; its last line is `WORKER_URL=<url>`.
+Add `FORCE=1` only to update an existing deployment. Exit codes: `2` not logged in (step 2 again), `3` name taken in the Cloudflare account (ask for another), `4` bad input (fix and rerun), `1` anything else, including a name check that could not run (read the message; the name was not assumed free). The script installs dependencies, generates types and typechecks, deploys with the token as a secret, and records the instance; its last line is `WORKER_URL=<url>`.
 
 ### 4. Verify and report
 

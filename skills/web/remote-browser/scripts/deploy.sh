@@ -3,7 +3,7 @@
 # Usage: WORKER_TOKEN=<secret> deploy.sh <worker-name> [target-dir]
 # Env:   FORCE=1    allow overwriting a Worker that already exists
 #        DRY_RUN=1  copy, install and typecheck only; no secret upload, no deploy
-# Exit:  2 = not logged in to Cloudflare, 3 = name already taken, 4 = bad input
+# Exit:  2 = not logged in to Cloudflare, 3 = name already taken, 4 = bad input, 1 = any other failure
 set -euo pipefail
 
 NAME="${1:-}"
@@ -62,9 +62,17 @@ if ! npx cf auth whoami 2>/dev/null | node -e '
   exit 2
 fi
 
-if npx cf workers get "$NAME" >/dev/null 2>&1 && [[ "${FORCE:-}" != "1" ]]; then
-  echo "A Worker named '$NAME' already exists in this account. Pick another name, or set FORCE=1 to overwrite it." >&2
-  exit 3
+# `cf workers get` exits 0 when the Worker exists and 1 with API error 10007 when it does not. Any other
+# failure (network, auth, quota) says nothing about the name, so stop instead of treating it as free.
+if [[ "${FORCE:-}" != "1" ]]; then
+  if GET_OUT="$(npx cf workers get "$NAME" 2>&1)"; then
+    echo "A Worker named '$NAME' already exists in this account. Pick another name, or set FORCE=1 to overwrite it." >&2
+    exit 3
+  elif ! grep -q '10007' <<<"$GET_OUT"; then
+    echo "Could not check whether the name '$NAME' is free:" >&2
+    echo "$GET_OUT" >&2
+    exit 1
+  fi
 fi
 
 # A secret can only be set on a Worker that exists, and this may be its first deploy, so the token goes up
