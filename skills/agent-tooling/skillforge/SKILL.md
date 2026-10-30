@@ -1,50 +1,40 @@
 ---
 name: skillforge
-description: Draft and scaffold OpenClaw-ready agent skills with the skillforge CLI. Use when turning a brief and optional tool catalog into a skill spec (JSON), scaffolding a skill folder from a spec, or validating a skill spec or tool catalog.
+description: Draft a skill spec from a brief and tool catalog, and scaffold a skill folder from a JSON spec, with the skillforge CLI. Use when wrapping several CLI tools into one skill; for a single skill without a catalog, write SKILL.md directly.
 ---
 
 # skillforge
 
-`skillforge` is a Go CLI (binary name `skillforge`) that drafts and scaffolds OpenClaw-ready agent skill folders. It has two non-interactive subcommands, `draft` and `init`, plus a Bubble Tea TUI that launches when it is run with no arguments. Always use the non-interactive subcommands in an agent context; the TUI requires a live terminal and is not scriptable.
+Turns a brief plus a JSON tool catalog into a spec (`draft`), and a spec into a skill folder (`init`). The value is the consistent scaffold around real tool commands. `draft` is keyword matching with canned text, so the wording of the result is yours to write.
 
-## Workflow
+## Get the binary
 
-1. Build or locate the `skillforge` binary.
-   - From the tool's repository (github.com/itamaker/forge-skill): `go build -o skillforge .` (or `make build`, or `go run . <subcommand> ...` without a separate build step).
-   - If installed via Homebrew (`brew install itamaker/tap/skillforge`) or a GitHub release, the `skillforge` binary is already on `PATH`.
+`brew install itamaker/tap/skillforge`, a release binary from github.com/itamaker/forge-skill, or `go build -o skillforge .` in a clone of that repo.
 
-2. If you only have a natural-language brief (and optionally a tool catalog), draft a skill spec first:
-   - `skillforge draft -brief <brief.md> [-catalog <tools.json>] [-out <spec.json>] [-name "<Explicit Name>"] [-max-tools <N>]`
-   - `-brief` is required; everything else is optional.
-   - Without `-catalog`, the drafted spec gets a single placeholder tool (`replace-me`) that must be replaced with a real tool before the spec is useful.
-   - Without `-out`, the drafted spec JSON prints to stdout instead of being written to a file.
-   - `-max-tools` caps how many tools are retrieved from the catalog by keyword overlap with the brief (default `3`).
-   - The drafted spec infers `name`, `slug`, `description`, `audience`, `category`, `tags`, `triggers`, `constraints`, `checks`, `examples`, and `workflow` from the brief text — review and edit these before scaffolding, since they are heuristic guesses, not guaranteed-accurate metadata.
+Bare `skillforge` opens an interactive TUI that hangs an agent shell; always pass a subcommand. Flags: `skillforge draft -h`, `skillforge init -h`. Builds after v0.3.0 also accept `skillforge -h` and `--version`; v0.3.0 exits 2 on both, and an invalid subcommand prints its usage.
 
-3. Scaffold a skill folder from a JSON skill spec (either drafted in step 2, or hand-written to match `examples/skill.json`):
-   - `skillforge init -spec <spec.json> -out <output-dir> [-force]`
-   - Both `-spec` and `-out` are required.
-   - The spec must have a non-empty `name`, a non-empty `description`, and at least one entry in `tools` where each tool has a non-empty `name` and `command`. `init` validates this before writing anything and exits with a clear one-line error (exit code `1`) if validation fails — this is the mechanism for checking whether a skill spec or tool catalog file is well-formed.
-   - On success it creates `<output-dir>/SKILL.md`, `<output-dir>/manifest.json`, `<output-dir>/bin/README.md`, and `<output-dir>/examples/usage.md`, and prints `generated skill scaffold in <output-dir>`.
+## Run
 
-4. Report the generated skill folder path back to the user, and point out any drafted fields (from step 2) that read as generic placeholders worth tightening by hand.
+```bash
+skillforge draft -brief brief.md -catalog tools.json -out spec.json   # -catalog optional, -max-tools N (default 3)
+skillforge init  -spec spec.json -out <dir>/<skill-name>               # -force deletes an existing <dir> first
+```
 
-## Safety Rules
+`init` needs `name`, `description` and at least one tool with `name` and `command`; exit 1 prints which is missing. Spec schema, catalog shapes and generated files: `references/REFERENCE.md`; samples in `examples/`.
 
-- `init` refuses to overwrite an existing `-out` directory unless `-force` is passed; with `-force` it deletes the existing directory contents first (`os.RemoveAll`). Only pass `-force` when the user clearly wants the existing output directory replaced.
+## Finish the scaffold by hand
 
-## Prompt Patterns
+Treat `draft` and `init` output as a first draft. Done when every item holds:
 
-- "Draft a skill spec from this brief and tool catalog."
-- "Turn `brief.md` into a skillforge spec, then scaffold it."
-- "Scaffold a skill folder from `skill.json` into `/tmp/my-skill`."
-- "Regenerate the skill folder at `/tmp/my-skill`, overwriting what's there."
-- "Draft a skill for retrieval evaluation using these three tools, keep only the top one."
-- "Check whether this skill spec has all the required fields before I scaffold it."
+1. `SKILL.md` starts with a `---` frontmatter block holding `name` (lowercase letters, digits, hyphens) and `description`. v0.3.0 writes no frontmatter: add it yourself, with `name` equal to the folder name.
+2. The `description` says what the skill is and one `Use when ...` sentence, about 250 characters.
+3. No `replace-me` tool remains. `draft` inserts it when no catalog tool matched the brief.
+4. The canned sections (`When To Use`, `Constraints`, `Validation`, workflow steps) are rewritten for this skill or deleted. Their text comes from category defaults, so it fits any skill equally.
+5. The folder name equals `name`, and `agents/openai.yaml` exists (builds after v0.3.0 write it; add it otherwise).
 
-## Resources
+## Limits
 
-- `examples/brief.md`: sample natural-language brief for `draft -brief`.
-- `examples/tools.json`: sample tool catalog (a plain array of tool objects) for `draft -catalog`.
-- `examples/skill.json`: sample hand-written skill spec for `init -spec`.
-- `references/REFERENCE.md`: full CLI flag reference, the `SkillSpec`/`ToolSpec`/`WorkflowStep` JSON schema, the two accepted tool-catalog shapes, and generated-file details.
+- `draft` ranks catalog tools by word overlap with the brief, so a brief that never uses a tool's words will not select it. List the tools in the spec yourself when the match matters.
+- `init -force` deletes the whole `-out` directory, including files you added; use it only when the user asks to replace the folder.
+- A name with no ASCII letters or digits has no slug: set an ASCII `slug` in the spec (builds after v0.3.0 exit 1 without one).
+- Exit 0 ok, 1 invalid spec or unreadable file, 2 usage error.

@@ -2,6 +2,16 @@
 
 Verified against the `skillforge` source (`internal/app/` in github.com/itamaker/forge-skill) and by running the built binary against `examples/`.
 
+## Builds after v0.3.0
+
+v0.3.0 is the last release at the time of writing; the behaviour below is in `itamaker/forge-skill` branch `fix/init-valid-skill-output` and ships with the next release. Check `skillforge --version`: v0.3.0 and earlier reject it with exit 2.
+
+- `init` writes `SKILL.md` starting with a `---` frontmatter block holding `name` (the slug, sanitised to `[a-z0-9]` plus single hyphens, at most 64 characters) and a one-line double-quoted `description` (capped at 300 characters; when it has no `Use when` clause, one is appended from the first one or two spec triggers).
+- `init` also writes `agents/openai.yaml` (`display_name`, `short_description`, `default_prompt`), rewrites `manifest.json` `slug` and the Metadata "Slug" line to the sanitised name, and prints a stderr warning (exit stays 0) when the `-out` folder name differs from the skill name.
+- A spec whose name and slug contain no ASCII letter or digit exits 1 (`set an ASCII slug in the spec`) before touching `-out`. `init` prints a `note:` line on stderr when it had to drop the `Use when` clause or cut the description.
+- `draft` prints `review:` lines on stderr (the triggers, constraints, checks and workflow come from category defaults; a placeholder tool was used; the name has no ASCII slug). Stdout and the spec JSON schema are unchanged, and category-specific triggers now come before generic ones.
+- `-h`, `--help`, `help`, `--version` and `version` print to stdout and exit 0, at the top level and after `init`, `draft` or `tui`. Real errors keep exit 1 and 2.
+
 ## CLI
 
 ### No arguments
