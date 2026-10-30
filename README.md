@@ -82,7 +82,7 @@ Work with web pages and web-based design tools.
 
 Everyday development workflow.
 
-- **[go-workspace-skill](./skills/dev/go-workspace-skill/SKILL.md)**: Sync, build and test a configurable multi-repo Go workspace from a single config file.
+- **[go-workspace-skill](./skills/dev/go-workspace-skill/SKILL.md)**: Sync, build and test a multi-repo Go workspace from one config file.
 
 ## In progress
 
