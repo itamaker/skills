@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "note": "Example model aliases and relative tiers; no account availability, live pricing, or effective runtime selection is asserted.",
+  "auto": {
+    "role_minimums": {
+      "chief_of_staff": "balanced",
+      "project_manager": "balanced",
+      "implementation_worker": "economy",
+      "architecture_advisor": "deep",
+      "code_advisor": "balanced",
+      "visual_advisor": "balanced"
+    },
+    "complexity": {
+      "low": "economy",
+      "medium": "balanced",
+      "high": "deep"
+    },
+    "risk": {
+      "low": "economy",
+      "medium": "balanced",
+      "high": "deep"
+    }
+  },
+  "clients": {
+    "codex": {
+      "tiers": {
+        "economy": {
+          "model": "gpt-6-luna",
+          "effort": "low"
+        },
+        "balanced": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium"
+        },
+        "deep": {
+          "model": "gpt-6-astra",
+          "effort": "high"
+        }
+      },
+      "model_capabilities": {
+        "gpt-6-luna": {
+          "tier": "economy",
+          "default_effort": "low",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "vision": true
+        },
+        "gpt-6.1-sol": {
+          "tier": "balanced",
+          "default_effort": "medium",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "vision": true
+        },
+        "gpt-6-astra": {
+          "tier": "deep",
+          "default_effort": "high",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "vision": true
+        }
+      }
+    },
+    "claude": {
+      "tiers": {
+        "economy": {
+          "model": "haiku",
+          "effort": "low"
+        },
+        "balanced": {
+          "model": "sonnet",
+          "effort": "medium"
+        },
+        "deep": {
+          "model": "opus",
+          "effort": "high"
+        }
+      },
+      "model_capabilities": {
+        "haiku": {
+          "tier": "economy",
+          "default_effort": "low",
+          "efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "vision": true
+        },
+        "sonnet": {
+          "tier": "balanced",
+          "default_effort": "medium",
+          "efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "vision": true
+        },
+        "opus": {
+          "tier": "deep",
+          "default_effort": "high",
+          "efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "vision": true
+        }
+      }
+    }
+  }
+}

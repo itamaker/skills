@@ -1,8 +1,6 @@
 ---
 name: architecture-advisor
 description: Advise on cross-module architecture, difficult failures, and tradeoffs between competing designs.
-model: opus
-effort: high
 tools: Read, Grep, Glob
 ---
 

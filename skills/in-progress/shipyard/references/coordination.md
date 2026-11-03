@@ -8,6 +8,8 @@ Turn requirements into verifiable tickets. Each needs an owner/coordinator, sour
 
 Use one PM only for a workstream needing sustained decomposition or acceptance tracking. CoS owns portfolio priorities and integration; each PM is the sole writer of its assigned project record. Workers report through their coordinator and preserve everyone else's changes.
 
+Before dispatch, resolve model and effort using [models.md](models.md). Record the requested choice, reason, host constraints, and observed effective choice (unknown when unavailable) in the ticket. Respect user pins and budget limits; choosing a cheaper model never waives required acceptance or independent verification.
+
 ## Dispatch and milestones
 
 Parallel ticket branches in one repository need separate worktrees/checkouts. Otherwise serialize their checkout, edits, tests, commits, and pushes. Specify ownership before dispatch; coordinate shared interfaces before dependent edits. Workers implement one active milestone at a time and do not dispatch PMs or implementation workers.

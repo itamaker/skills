@@ -10,6 +10,7 @@ The main conversation owns the user's goal, priorities, integration, and final a
 ## Load only your path
 
 - **Coordinator / PM:** read [coordination.md](references/coordination.md) for dispatch, exclusive ownership, milestones, and recovery. Read [verification.md](references/verification.md) when defining checks or accepting a revision.
+- **Model / effort selection:** before starting a subagent, follow [models.md](references/models.md). Select by task and risk from the central policy, honor explicit overrides, and check the actual host's override support.
 - **Implementation worker:** read [implementation.md](references/implementation.md). Run only tests and checks related to the ticket's behavior and affected dependencies; full-suite execution belongs to the coordinator's CI/integration stage.
 - **Advisor:** answer the bounded question using current evidence. Remain read-only, return actionable findings, and finish without spawning helpers. Read [verification.md](references/verification.md) only when test/acceptance policy is the question.
 - **Merge / cleanup:** read [delivery.md](references/delivery.md) before publishing, merging, or deleting a task branch.

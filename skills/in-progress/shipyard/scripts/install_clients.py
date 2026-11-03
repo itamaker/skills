@@ -5,6 +5,8 @@ import argparse
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import os
+import importlib.util
+import json
 from pathlib import Path
 import stat
 import sys
@@ -101,13 +103,60 @@ def write_asset(home, relative, content, executable):
         return f'Installed global asset: {destination}' + (f' (backup: {destination.parent / backup})' if backup else '')
 
 
-def install(skill_root, home, client='both', apply=False):
+def preset_selections(root, selected, tier, policy):
+    """Explicit presets pin the next session; normal installs remain unpinned."""
+    if tier == 'inherit':
+        if policy is not None:
+            raise InstallError('--policy requires an explicit --tier preset')
+        return {}
+    if tier not in ('economy', 'balanced', 'deep'):
+        raise InstallError(f'Unknown preset tier: {tier}')
+    source = root / 'scripts/model_policy.py'
+    check_parents(source, root)
+    if source.is_symlink() or not source.is_file():
+        raise InstallError(f'Missing regular policy module: {source}')
+    spec = importlib.util.spec_from_file_location('shipyard_model_policy', source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    configuration = module.load_policy(policy or root / 'assets/model-policy.json')
+    return {
+        chosen: {
+            role: module.select(configuration, chosen, role=role, tier=tier,
+                                runtime='session', env={})
+            for role in ROLES
+        }
+        for chosen in selected
+    }
+
+
+def render_preset(chosen, asset, content, selection):
+    if not selection:
+        return content
+    model, effort = selection['requested_model'], selection['requested_effort']
+    text = content.decode()
+    if chosen == 'codex' and (asset.startswith('agents/') or asset.endswith('.config.toml')):
+        return (f'model = {json.dumps(model)}\nmodel_reasoning_effort = {json.dumps(effort)}\n' + text).encode()
+    if chosen == 'claude' and asset.startswith('agents/'):
+        if not text.startswith('---\n'):
+            raise InstallError(f'Missing agent frontmatter: {asset}')
+        return ('---\n' + f'model: {json.dumps(model)}\neffort: {json.dumps(effort)}\n' + text[4:]).encode()
+    if chosen == 'claude' and asset.endswith('.settings.json'):
+        if effort not in ('low', 'medium', 'high', 'xhigh'):
+            raise InstallError(f'Claude session presets cannot persist effort {effort!r}; choose a supported saved level or use supported per-invocation effort')
+        data = json.loads(text)
+        data.update(model=model, effortLevel=effort)
+        return (json.dumps(data, indent=2) + '\n').encode()
+    return content
+
+
+def install(skill_root, home, client='both', apply=False, tier='inherit', policy=None):
     """Validate every selected source and target before previewing or writing."""
     if client not in ('codex', 'claude', 'both'):
         raise InstallError(f'Unknown client: {client}')
     root = Path(skill_root).resolve()
     home = Path(os.path.abspath(Path(home).expanduser()))
     selected = ('codex', 'claude') if client == 'both' else (client,)
+    selections = preset_selections(root, selected, tier, policy)
     plan = []
     for chosen in selected:
         marker = home / ('.agents' if chosen == 'codex' else '.claude') / 'skills/shipyard/SKILL.md'
@@ -123,11 +172,14 @@ def install(skill_root, home, client='both', apply=False):
             check_parents(destination, home)
             if (destination.exists() or destination.is_symlink()) and not (destination.is_symlink() or destination.is_file()):
                 raise InstallError(f'Destination is not a regular file or symlink: {destination}')
-            content = source.read_bytes()
+            role = Path(asset).stem.replace('-', '_') if asset.startswith('agents/') else 'chief_of_staff'
+            content = render_preset(chosen, asset, source.read_bytes(), selections.get(chosen, {}).get(role))
             executable = chosen == 'codex' and asset == 'chief-of-staff'
             unchanged = same_file(destination, content, executable)
             plan.append((relative, content, executable, unchanged))
     messages = ['Global scope: optional native agent roles and launchers only; global instructions and settings are unchanged.']
+    if selections:
+        messages.append(f'Next-session preset: {tier}. Role pins intentionally override per-task selection until reinstalled with --tier inherit.')
     for relative, content, executable, unchanged in plan:
         if unchanged:
             messages.append(f'Unchanged global asset: {home / relative}')
@@ -142,12 +194,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--client', choices=('codex', 'claude', 'both'), default='both')
     parser.add_argument('--home', type=Path, default=Path.home())
+    parser.add_argument('--tier', choices=('inherit', 'economy', 'balanced', 'deep'), default='inherit', help='Optional next-session preset; inherit leaves per-task overrides available')
+    parser.add_argument('--policy', type=Path, help='Custom model policy for an explicit preset')
     parser.add_argument('--apply', action='store_true', help='Write selected assets; default only previews')
     args = parser.parse_args()
     try:
         print('\n'.join(install(Path(__file__).resolve().parents[1], **vars(args))))
     except (InstallError, OSError, ValueError) as exc:
-        print(f'Setup skipped: {exc}', file=sys.stderr)
+        print(f'Setup stopped: {exc}. If applying, earlier assets may already be installed; replaced files have adjacent backups.', file=sys.stderr)
         return 1
     return 0
 

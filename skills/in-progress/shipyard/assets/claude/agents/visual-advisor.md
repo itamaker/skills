@@ -1,8 +1,6 @@
 ---
 name: visual-advisor
 description: Analyze screenshots, charts, interface consistency, readability, and the clarity of user-facing copy.
-model: sonnet
-effort: medium
 tools: Read, Grep, Glob
 ---
 

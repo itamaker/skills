@@ -12,7 +12,7 @@ Future publication and installation belong to the skills repository. Promote to 
 
 ## Optional native role setup
 
-The skill is self-contained: `assets/codex` and `assets/claude` own the native role templates, model choices, and optional launch configuration. The old `dot_codex` and `dot_claude` source directories are retired from dotfiles. Do not load all assets into context during ordinary work.
+The skill is self-contained: `assets/codex` and `assets/claude` own the native role templates and optional launch configuration; `assets/model-policy.json` centralizes model/effort choices. The old `dot_codex` and `dot_claude` source directories are retired from dotfiles. Do not load all assets into context during ordinary work.
 
 After globally installing the skill, preview then explicitly apply its native configuration:
 
@@ -30,7 +30,17 @@ Launch the configured primary session:
 claude --settings ~/.claude/chief-of-staff.settings.json --agent chief-of-staff
 ```
 
-The Codex launcher reads its adjacent standalone config and passes role registrations as CLI overrides; it preserves the user's global config and does not require a pre-existing named profile. `~/.codex/chief-of-staff --print-command` previews the arguments. Skill-only sessions can invoke `$shipyard` in Codex or `/shipyard` in Claude Code; delegation requires installed/native roles. None of these configurations starts a background runner.
+The default installation leaves model/effort unpinned so supported hosts can apply task-level choices. The primary session inherits the user's client settings; Shipyard does not silently change a running primary session. The Codex launcher reads its adjacent standalone config and passes role registrations as CLI overrides; it preserves the user's global config and does not require a pre-existing named profile. `~/.codex/chief-of-staff --print-command` previews the arguments. Skill-only sessions can invoke `$shipyard` in Codex or `/shipyard` in Claude Code; delegation requires installed/native roles. None of these configurations starts a background runner.
+
+When upgrading from fixed-role assets, preview and apply the native installer again with its default `--tier inherit` to remove old pins, then start a new session. Updating the skill package alone does not rewrite already installed role files.
+
+If the host cannot pass task-level overrides, preview an explicit next-session preset and then add `--apply` when wanted:
+
+```bash
+python3 ~/.agents/skills/shipyard/scripts/install_clients.py --client both --tier balanced
+```
+
+`--tier economy`, `balanced`, or `deep` pins the selected pair in the installed native files. Those pins intentionally constrain per-task selection (especially on Codex); start a new primary session after applying. Reinstall with `--tier inherit --apply` to remove them and restore task-level override capability. Use `--policy /path/to/models.json` with an explicit tier to render a customized policy; see [models.md](models.md) for automatic selection and manual task overrides. Existing sessions/agents do not become dynamically reconfigured merely because files change.
 
 | Responsibility | Codex role | Claude role |
 | --- | --- | --- |

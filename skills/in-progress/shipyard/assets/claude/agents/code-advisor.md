@@ -1,8 +1,6 @@
 ---
 name: code-advisor
 description: Trace execution paths, evaluate implementation plans, and independently review consequential code changes.
-model: sonnet
-effort: high
 tools: Read, Grep, Glob
 ---
 

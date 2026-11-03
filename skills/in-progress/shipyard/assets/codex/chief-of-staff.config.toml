@@ -1,5 +1,3 @@
-model = "gpt-6.1-sol"
-model_reasoning_effort = "high"
 developer_instructions = "Run the primary conversation in Chief of Staff operating mode. Read ~/.codex/agents/chief_of_staff.toml and follow its developer_instructions, together with the global AGENTS.md and applicable project instructions."
 
 [agents.chief_of_staff]
