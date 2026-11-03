@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Checks the invariants described in CLAUDE.md. No dependencies. Exit 1 on any error.
+// Checks the invariants described in .claude/CLAUDE.md. No dependencies. Exit 1 on any error.
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";

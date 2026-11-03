@@ -2,7 +2,7 @@
 
 [![skills.sh](https://skills.sh/b/itamaker/skills)](https://skills.sh/itamaker/skills)
 
-Agent skills by [Zhaoyang Jia](https://github.com/itamaker): tooling for building and evaluating LLM agents, web page export, and Go workspace management. Each skill is a small folder with a `SKILL.md`. They work with Claude Code, Codex and other agents that read skills.
+Agent skills by [Zhaoyang Jia](https://github.com/itamaker): tooling for building, evaluating, and coordinating LLM agents, web page export, and Go workspace management. Each skill is a small folder with a `SKILL.md`. They work with Claude Code, Codex and other agents that read skills.
 
 > These skills used to live in separate repositories (`stitch-skill`, `runlens-skill` and so on). They now live here; the old repositories point back to this one.
 
@@ -55,6 +55,7 @@ The same `npx skills` installer writes the skills into your repo as ordinary fil
 | remote-browser | Node.js 22.18+ with TypeScript support (the skill installs one if yours lacks it), npm, curl and a Cloudflare account; the skill deploys its own Worker for you |
 | stitch | Node.js (or Bun) and Stitch credentials: `STITCH_API_KEY`, or OAuth via `STITCH_ACCESS_TOKEN` plus `GOOGLE_CLOUD_PROJECT`. The SDK runner installs itself on first use |
 | go-workspace-skill | Python 3, Git and Go, plus a workspace config file (the skill can create one) |
+| shipyard | Python 3.11+ for its configuration and native setup helpers; Git and authenticated `gh` for merged-branch cleanup. Native roles are an optional, separate setup step. |
 
 ## Reference
 
@@ -81,6 +82,7 @@ Work with web pages and web-based design tools.
 
 Everyday development workflow.
 
+- **[shipyard](./skills/dev/shipyard/SKILL.md)**: Coordinate Codex and Claude with scoped tests, model routing, CI acceptance, and safe branch cleanup.
 - **[go-workspace-skill](./skills/dev/go-workspace-skill/SKILL.md)**: Sync, build and test a multi-repo Go workspace from one config file.
 
 ## In progress

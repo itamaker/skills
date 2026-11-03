@@ -25,6 +25,7 @@
       "title": "Dev",
       "description": "Everyday development workflow.",
       "skills": [
+        "shipyard",
         "go-workspace-skill"
       ]
     }

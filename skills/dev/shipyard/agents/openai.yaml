@@ -1,0 +1,4 @@
+interface:
+  display_name: "Shipyard"
+  short_description: "Coordinate scoped work, CI acceptance, and cleanup"
+  default_prompt: "Use $shipyard to plan and deliver this work with scoped tests and clear acceptance."
