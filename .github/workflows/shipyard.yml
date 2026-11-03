@@ -1,0 +1,35 @@
+name: Shipyard
+
+on:
+  pull_request:
+    paths: ['skills/in-progress/shipyard/**', 'skills/in-progress/README.md', 'scripts/check-skills.mjs', '.github/workflows/shipyard.yml']
+  push:
+    branches: [main]
+    paths: ['skills/in-progress/shipyard/**', 'skills/in-progress/README.md', 'scripts/check-skills.mjs', '.github/workflows/shipyard.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shipyard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shipyard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check skill catalog metadata
+        run: node scripts/check-skills.mjs
+      - name: Check this skill's installer and branch cleanup
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s skills/in-progress/shipyard/scripts/tests -p 'test_*.py' -v

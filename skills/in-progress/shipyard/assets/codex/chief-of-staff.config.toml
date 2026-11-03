@@ -1,0 +1,27 @@
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+developer_instructions = "Run the primary conversation in Chief of Staff operating mode. Read ~/.codex/agents/chief_of_staff.toml and follow its developer_instructions, together with the global AGENTS.md and applicable project instructions."
+
+[agents.chief_of_staff]
+description = "Receive rough requirements, rank daily priorities, coordinate PMs and workers, and track checkpointed delivery through reviewed PRs."
+config_file = "agents/chief_of_staff.toml"
+
+[agents.project_manager]
+description = "Coordinate one complex project or independent workstream with task briefs, dependencies, worker assignments, and acceptance evidence."
+config_file = "agents/project_manager.toml"
+
+[agents.implementation_worker]
+description = "Implement a bounded task within assigned files or modules, run appropriate checks, and return concrete deliverables and verification evidence."
+config_file = "agents/implementation_worker.toml"
+
+[agents.architecture_advisor]
+description = "Advise on cross-module architecture, difficult failures, and tradeoffs between competing designs."
+config_file = "agents/architecture_advisor.toml"
+
+[agents.code_advisor]
+description = "Trace execution paths, evaluate implementation plans, and independently review consequential code changes."
+config_file = "agents/code_advisor.toml"
+
+[agents.visual_advisor]
+description = "Analyze screenshots, charts, interface consistency, readability, and the clarity of user-facing copy."
+config_file = "agents/visual_advisor.toml"
