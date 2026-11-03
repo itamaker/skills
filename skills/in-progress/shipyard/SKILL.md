@@ -1,6 +1,6 @@
 ---
 name: shipyard
-description: Coordinate scoped agent delivery across Codex and Claude Code. Use when delegating implementation, planning project work, accepting high-risk changes, delivering PRs, or cleaning up merged task branches with minimal repeated work.
+description: Coordinate scoped agent delivery across Codex and Claude Code. Use when configuring agent model/effort defaults, delegating work, planning projects, accepting high-risk changes, delivering PRs, or cleaning up merged task branches.
 ---
 
 # Shipyard
@@ -9,6 +9,7 @@ The main conversation owns the user's goal, priorities, integration, and final a
 
 ## Load only your path
 
+- **Configure models:** for `/shipyard` or `$shipyard` requests to change/show/reset model settings, read [configuration.md](references/configuration.md) first. Map intent to task, one-shot, project, or personal scope; persist only an explicit save request.
 - **Coordinator / PM:** read [coordination.md](references/coordination.md) for dispatch, exclusive ownership, milestones, and recovery. Read [verification.md](references/verification.md) when defining checks or accepting a revision.
 - **Model / effort selection:** before starting a subagent, follow [models.md](references/models.md). Select by task and risk from the central policy, honor explicit overrides, and check the actual host's override support.
 - **Implementation worker:** read [implementation.md](references/implementation.md). Run only tests and checks related to the ticket's behavior and affected dependencies; full-suite execution belongs to the coordinator's CI/integration stage.

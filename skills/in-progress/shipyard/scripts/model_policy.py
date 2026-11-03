@@ -2,6 +2,7 @@
 """Plan a task's requested model/effort without dispatching or making model calls."""
 
 import argparse
+import importlib.util
 from collections.abc import Mapping
 import json
 import os
@@ -173,10 +174,14 @@ def main():
     parser.add_argument('--role', default='implementation_worker')
     parser.add_argument('--complexity', choices=('low', 'medium', 'high'), default='medium')
     parser.add_argument('--risk', choices=('low', 'medium', 'high'), default='low')
-    parser.add_argument('--tier', choices=('auto', *TIERS), default='auto')
+    parser.add_argument('--tier', choices=('auto', *TIERS))
     parser.add_argument('--model')
     parser.add_argument('--effort')
-    parser.add_argument('--max-tier', choices=TIERS, default='deep')
+    parser.add_argument('--max-tier', choices=TIERS)
+    parser.add_argument('--project', type=Path, help='Use settings from this authorized project')
+    parser.add_argument('--user-config', type=Path, help='Alternate personal settings file')
+    parser.add_argument('--trust-project', action='store_true', help='Use discovered Git-project settings only after establishing workspace trust')
+    parser.add_argument('--no-project-settings', action='store_true', help='Ignore project settings while retaining personal defaults')
     parser.add_argument('--escalate', action='store_true')
     parser.add_argument('--escalation-count', type=int, default=0)
     parser.add_argument('--evidence')
@@ -184,9 +189,28 @@ def main():
     parser.add_argument('--claude-version')
     args = vars(parser.parse_args())
     try:
-        policy = load_policy(args.pop('policy'))
-        print(json.dumps(select(policy, **args), indent=2))
-    except (ValueError, OSError, TypeError) as exc:
+        settings_source = Path(__file__).resolve().with_name('model_settings.py')
+        spec = importlib.util.spec_from_file_location('shipyard_model_settings', settings_source)
+        settings_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(settings_module)
+        overrides = {key: value for key in ('tier', 'model', 'effort', 'max_tier', 'policy')
+                     if (value := args.pop(key)) is not None}
+        if 'policy' in overrides:
+            overrides['policy'] = str(overrides['policy'])
+        resolved = settings_module.resolve(
+            args['client'], args['role'], project=args.pop('project'),
+            user_config=args.pop('user_config'), trust_project=args.pop('trust_project'),
+            no_project=args.pop('no_project_settings'), overrides=overrides,
+        )
+        policy = load_policy(resolved['policy_path'])
+        args.update(resolved['values'])
+        result = select(policy, **args)
+        result['warnings'] = list(dict.fromkeys([*resolved['warnings'], *result['warnings']]))
+        result['settings'] = {
+            key: resolved[key] for key in ('policy_path', 'sources', 'layers', 'ceiling_sources')
+        }
+        print(json.dumps(result, indent=2))
+    except (ValueError, OSError, TypeError, ImportError) as exc:
         print(f'Model plan rejected: {exc}', file=sys.stderr)
         return 1
     return 0

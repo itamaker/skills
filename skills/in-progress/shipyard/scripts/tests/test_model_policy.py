@@ -216,11 +216,12 @@ class ModelPolicyTests(unittest.TestCase):
             policy_path = Path(temporary) / 'policy.json'
             policy_path.write_text(json.dumps(self.policy))
             self.assertEqual(selector.load_policy(policy_path), self.policy)
-            result = subprocess.run([sys.executable, str(SCRIPT), '--policy', str(policy_path), '--client', 'codex', '--complexity', 'low'], capture_output=True, text=True)
+            isolation = ['--user-config', str(Path(temporary) / 'missing-settings.json'), '--no-project-settings']
+            result = subprocess.run([sys.executable, str(SCRIPT), '--policy', str(policy_path), '--client', 'codex', '--complexity', 'low', *isolation], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(result.stdout)['requested_model'], 'gpt-6-luna')
             policy_path.write_text('{invalid')
-            result = subprocess.run([sys.executable, str(SCRIPT), '--policy', str(policy_path), '--client', 'codex'], capture_output=True, text=True)
+            result = subprocess.run([sys.executable, str(SCRIPT), '--policy', str(policy_path), '--client', 'codex', *isolation], capture_output=True, text=True)
             self.assertEqual(result.returncode, 1)
             self.assertIn('Model plan rejected', result.stderr)
             self.assertNotIn('Traceback', result.stderr)

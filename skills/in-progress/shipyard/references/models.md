@@ -18,6 +18,8 @@ python3 /path/to/shipyard/scripts/model_policy.py --client codex --role implemen
 
 Resolve the skill path from the loaded installation. Load policy once per dispatch batch and reuse the selector's result for unchanged task facts. The helper makes no model calls and does not dispatch agents or modify client files.
 
+The CLI resolves saved personal/project preferences before applying current-request fields. Use `--project /authorized/repo` only for an established trusted/authorized workspace; otherwise project settings stay ignored. `--no-project-settings` keeps personal defaults while opting out of project data. See [configuration.md](configuration.md) for `/shipyard` intents, scoped saves, reset, one-shot lifetime, and policy-path precedence. The pure Python `select()` API remains stateless; callers using it directly must resolve settings themselves.
+
 ## Apply only supported settings
 
 Inspect the actual dispatch tool's parameters and native role definition first. Use `--runtime spawn` only when both model and effort overrides are supported. Pass the returned **requested** pair in those actual fields, together with the unchanged role and bounded ticket; never claim a model changed because the prompt mentions it. Default `unknown` produces a plan only; `--runtime fixed` requires a next-session preset. Keep requested/effective values separate: effective remains unknown until the host reports it.
