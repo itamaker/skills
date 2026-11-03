@@ -8,7 +8,7 @@ Turn requirements into verifiable tickets. Each needs an owner/coordinator, sour
 
 Use one PM only for a workstream needing sustained decomposition or acceptance tracking. CoS owns portfolio priorities and integration; each PM is the sole writer of its assigned project record. Workers report through their coordinator and preserve everyone else's changes.
 
-Before dispatch, resolve model and effort using [models.md](models.md). Record the requested choice, reason, host constraints, and observed effective choice (unknown when unavailable) in the ticket. Respect user pins and budget limits; choosing a cheaper model never waives required acceptance or independent verification.
+Before dispatch, resolve model and effort using [models.md](models.md), passing the actual stage and canonical agent name from `stage_registry.py`. Record stage, agent, requested choice, reason, host constraints, and observed effective choice (unknown when unavailable) in the ticket. Respect user pins and budget limits; choosing a cheaper model never waives required acceptance or independent verification.
 
 ## Dispatch and milestones
 
@@ -29,6 +29,6 @@ CoS schedules only applicable gates:
 
 Workers return evidence and release their slot before waiting on review when possible. Reuse a review only when the question and covered evidence remain unchanged. Record why a gate was skipped instead of consulting every advisor by default.
 
-PM (or CoS without a PM) accepts each criterion with revision-specific evidence and distinguishes passed, failed, and unverified. CoS checks integration before final delivery. For authentication, payments, destructive migrations, or critical user journeys, assign independent functional verification to CoS/PM or a temporary verification-only worker; an author's self-test is not independent verification.
+PM (or CoS without a PM) accepts each criterion with revision-specific evidence and distinguishes passed, failed, and unverified. CoS checks integration before final delivery. For authentication, payments, destructive migrations, or critical user journeys, assign independent functional verification to a new `verify-worker` invocation (or independent CoS/PM verification); an author's self-test is not independent verification. Use `ci-worker` only for scoped pipeline/infrastructure failures and `deliver-worker` only for an authorized delegated delivery operation. These available roles are not permanent background workers.
 
 Continue already approved ready work within the budget. Preserve blocked work and proceed with independent work. A skill/configuration is not an unattended runner: verify the actual session/scheduler and access before claiming continuous execution.

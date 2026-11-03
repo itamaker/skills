@@ -92,10 +92,10 @@ class ModelCommandTests(unittest.TestCase):
 
     def test_project_role_default_does_not_change_other_roles(self):
         self.settings('set', '--scope', 'user', '--tier', 'balanced', '--apply')
-        self.settings('set', '--scope', 'project', '--role', 'implementation_worker', '--tier', 'economy', '--apply')
+        self.settings('set', '--scope', 'project', '--role', 'implementation-worker', '--tier', 'economy', '--apply')
         self.assertEqual(self.plan()['tier'], 'economy')
-        self.assertEqual(self.plan('--role', 'code_advisor')['tier'], 'balanced')
-        self.settings('reset', '--scope', 'project', '--role', 'implementation_worker', '--apply')
+        self.assertEqual(self.plan('--role', 'code-advisor')['tier'], 'balanced')
+        self.settings('reset', '--scope', 'project', '--role', 'implementation-worker', '--apply')
         self.assertEqual(self.plan()['tier'], 'balanced')
 
     def test_untrusted_or_ignored_project_keeps_personal_default(self):

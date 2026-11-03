@@ -41,8 +41,18 @@ class ModelPolicyTests(unittest.TestCase):
                 self.assertIsNone(result['effective_model'])
                 self.assertIsNone(result['effective_effort'])
 
+    def test_legacy_role_spellings_and_six_role_policy_remain_readable(self):
+        core = selector.ROLES[:6]
+        self.policy['auto']['role_minimums'] = {
+            role.replace('-', '_'): self.policy['auto']['role_minimums'][role]
+            for role in core
+        }
+        self.assertEqual(self.select(role='implementation_worker', complexity='low')['tier'], 'economy')
+        self.assertEqual(self.select(role='verify_worker', complexity='low')['tier'], 'balanced')
+        self.assertEqual(self.select(role='ci-worker', complexity='low')['tier'], 'balanced')
+
     def test_explicit_tier_can_override_auto_minimum_with_warning(self):
-        result = self.select(role='architecture_advisor', tier='economy')
+        result = self.select(role='architecture-advisor', tier='economy')
         self.assertEqual((result['requested_model'], result['requested_effort']), ('gpt-6-luna', 'low'))
         self.assertTrue(any('below recommended deep' in w for w in result['warnings']))
 
@@ -174,16 +184,16 @@ class ModelPolicyTests(unittest.TestCase):
 
     def test_visual_auto_finds_capable_tier_without_lowering_minimum(self):
         self.policy['clients']['codex']['model_capabilities']['gpt-6.1-sol']['vision'] = False
-        result = self.select(role='visual_advisor')
+        result = self.select(role='visual-advisor')
         self.assertEqual(result['tier'], 'deep')
         with self.assertRaisesRegex(selector.PolicyError, 'vision-capable'):
-            self.select(role='visual_advisor', max_tier='balanced')
+            self.select(role='visual-advisor', max_tier='balanced')
         with self.assertRaisesRegex(selector.PolicyError, 'vision capability'):
-            self.select(role='visual_advisor', model='gpt-6.1-sol')
+            self.select(role='visual-advisor', model='gpt-6.1-sol')
 
     def test_invalid_entire_policy_is_rejected_even_for_other_client(self):
         corruptions = [lambda p: p.update(version=True),
-                       lambda p: p['auto']['role_minimums'].pop('project_manager'),
+                       lambda p: p['auto']['role_minimums'].pop('project-manager'),
                        lambda p: p['clients']['claude']['model_capabilities']['sonnet'].update(vision='yes'),
                        lambda p: p['clients']['claude']['model_capabilities']['sonnet'].update(default_effort='max'),
                        lambda p: p['clients']['claude']['model_capabilities']['sonnet'].update(tier='unknown'),

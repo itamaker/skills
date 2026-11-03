@@ -8,6 +8,7 @@ import fcntl
 import importlib.util
 import json
 import os
+import runpy
 from pathlib import Path
 import stat
 import subprocess
@@ -16,8 +17,10 @@ import uuid
 
 
 TIERS = ('economy', 'balanced', 'deep')
-ROLES = ('chief_of_staff', 'project_manager', 'implementation_worker',
-         'architecture_advisor', 'code_advisor', 'visual_advisor')
+_REGISTRY = runpy.run_path(str(Path(__file__).resolve().with_name('stage_registry.py')))
+ROLES = _REGISTRY['ROLES']
+STAGES = _REGISTRY['STAGES']
+TARGETS = _REGISTRY['TARGETS']
 FIELDS = {'tier', 'model', 'effort', 'max_tier', 'policy'}
 
 
@@ -32,9 +35,14 @@ def require(condition, message):
 
 def role_name(role):
     require(isinstance(role, str), 'Role must be a string')
-    name = role.replace('-', '_')
+    name = role.replace('_', '-')
     require(name in ROLES, f'Unknown role: {role}')
     return name
+
+
+def stage_name(stage):
+    require(stage is None or (isinstance(stage, str) and stage in STAGES), f'Unknown stage: {stage}')
+    return stage
 
 
 def pins(values, *, allow_policy=True):
@@ -72,7 +80,7 @@ def validate(document):
     require(isinstance(clients, dict) and not set(clients) - {'codex', 'claude'}, 'Unknown settings client')
     result = {'version': 1, 'clients': {}}
     for client, config in clients.items():
-        require(isinstance(config, dict) and not set(config) - {'defaults', 'roles'}, 'Invalid client settings keys')
+        require(isinstance(config, dict) and not set(config) - {'defaults', 'roles', 'stages'}, 'Invalid client settings keys')
         entry = {}
         if 'defaults' in config:
             entry['defaults'] = pins(config['defaults'])
@@ -83,6 +91,17 @@ def validate(document):
                 name = role_name(role)
                 require(name not in entry['roles'], 'Duplicate normalized role')
                 entry['roles'][name] = pins(value, allow_policy=False)
+        if 'stages' in config:
+            require(isinstance(config['stages'], dict), 'Stage settings must be an object')
+            entry['stages'] = {}
+            for stage, roles in config['stages'].items():
+                stage_name(stage)
+                require(isinstance(roles, dict), 'Stage roles must be an object')
+                entry['stages'][stage] = {}
+                for role, value in roles.items():
+                    name = role_name(role)
+                    require(name not in entry['stages'][stage], 'Duplicate normalized stage role')
+                    entry['stages'][stage][name] = pins(value, allow_policy=False)
         result['clients'][client] = entry
     return result
 
@@ -153,14 +172,17 @@ def policy_module():
     return module
 
 
-def assemble(client, role, user, project, documents, overrides, warnings, cwd):
+def assemble(client, role, user, project, documents, overrides, warnings, cwd, stage=None):
     layers = [{'name': 'builtin', 'path': None, 'values': {'tier': 'auto', 'max_tier': 'deep'}}]
     for scope, path in [('user', user), ('project', project)]:
         if path is None:
             continue
         entry = documents[path].get('clients', {}).get(client, {})
-        for suffix, values in [('defaults', entry.get('defaults', {})),
-                               (f'roles.{role}', entry.get('roles', {}).get(role, {}))]:
+        entries = [('defaults', entry.get('defaults', {})),
+                   (f'roles.{role}', entry.get('roles', {}).get(role, {}))]
+        if stage is not None:
+            entries.append((f'stages.{stage}.{role}', entry.get('stages', {}).get(stage, {}).get(role, {})))
+        for suffix, values in entries:
             if values:
                 layers.append({'name': f'{scope}.{suffix}', 'path': str(path), 'values': dict(values)})
     if overrides:
@@ -196,16 +218,18 @@ def assemble(client, role, user, project, documents, overrides, warnings, cwd):
     if values['tier'] != 'auto' or values.get('model') is not None:
         require(TIERS.index(validation['tier']) <= TIERS.index(values['max_tier']), 'Explicit selection exceeds the strictest saved/task max_tier')
     return {'values': values, 'policy_path': policy_path, 'sources': sources,
-            'layers': layers, 'warnings': list(warnings), 'ceiling_sources': ceilings}
+            'layers': layers, 'warnings': list(warnings), 'ceiling_sources': ceilings,
+            'stage': stage, 'role': role}
 
 
-def resolve(client, role='implementation_worker', *, project=None, user_config=None,
-            overrides=None, no_project=False, trust_project=False, cwd=None):
+def resolve(client, role='implementation-worker', *, project=None, user_config=None,
+            overrides=None, no_project=False, trust_project=False, cwd=None, stage=None):
+    stage = stage_name(stage)
     require(client in ('codex', 'claude'), 'Unknown client')
     role = role_name(role)
     user, project_path, warnings, cwd = locations(project, user_config, no_project, trust_project, cwd)
     documents = {path: read_document(path)[0] for path in (user, project_path) if path is not None}
-    return assemble(client, role, user, project_path, documents, overrides, warnings, cwd)
+    return assemble(client, role, user, project_path, documents, overrides, warnings, cwd, stage)
 
 
 @contextmanager
@@ -226,10 +250,12 @@ def open_parent(path):
         os.close(fd)
 
 
-def edit(document, client, role, action, values, fields, settings_path, cwd):
+def edit(document, client, role, action, values, fields, settings_path, cwd, stage=None):
     document = validate(document)
     entry = document['clients'].setdefault(client, {})
-    if role is None:
+    if stage is not None:
+        parent, key = entry.setdefault('stages', {}).setdefault(stage, {}), role
+    elif role is None:
         parent, key = entry, 'defaults'
     else:
         parent, key = entry.setdefault('roles', {}), role
@@ -253,6 +279,11 @@ def edit(document, client, role, action, values, fields, settings_path, cwd):
         parent.pop(key, None)
     if not entry.get('roles'):
         entry.pop('roles', None)
+    for phase in list(entry.get('stages', {})):
+        if not entry['stages'][phase]:
+            entry['stages'].pop(phase)
+    if not entry.get('stages'):
+        entry.pop('stages', None)
     if not entry:
         document['clients'].pop(client, None)
     return validate(document)
@@ -288,11 +319,37 @@ def atomic_write(path, parent, raw, document):
     return str(path.parent / backup) if backup else None
 
 
-def configure(client, action, scope, *, role=None, values=None, fields=None, apply=False,
-              project=None, user_config=None, no_project=False, trust_project=False, cwd=None):
-    """Return resolved preview/result plus settings_path/action/applied/backup metadata."""
+def batch_operations(operations):
+    require(isinstance(operations, list) and bool(operations), 'Batch requires a nonempty operations list')
+    normalized, targets = [], set()
+    for operation in operations:
+        require(isinstance(operation, dict) and not set(operation) - {'action', 'stage', 'role', 'values', 'fields'}, 'Invalid batch operation keys')
+        action = operation.get('action')
+        require(action in ('set', 'reset'), 'Operation action must be set or reset')
+        stage = stage_name(operation.get('stage'))
+        role = role_name(operation['role']) if operation.get('role') is not None else None
+        require(stage is None or role is not None, 'Stage editing requires a role')
+        require((stage, role) not in targets, 'Duplicate stage/role target in batch')
+        targets.add((stage, role))
+        values, fields = operation.get('values') or {}, operation.get('fields')
+        require(isinstance(values, dict), 'Operation values must be an object')
+        require(fields is None or (isinstance(fields, list) and all(isinstance(field, str) for field in fields)), 'Reset fields must be a list of field names')
+        if action == 'set':
+            require(not fields, 'Set does not accept reset fields')
+            require(bool(values), 'Set requires at least one field')
+            pins(values, allow_policy=role is None)
+        else:
+            require(not values, 'Reset does not accept pin values')
+            require(not fields or set(fields) <= (FIELDS if role is None else FIELDS - {'policy'}), 'Invalid reset field')
+        normalized.append({'action': action, 'stage': stage, 'role': role, 'values': values, 'fields': fields})
+    return normalized
+
+
+def configure_batch(client, scope, operations, *, apply=False, project=None, user_config=None,
+                    no_project=False, trust_project=False, cwd=None):
+    """Validate all final edits, then persist one locked transaction and one backup."""
     require(client in ('codex', 'claude') and scope in ('user', 'project'), 'Invalid client/scope')
-    role = role_name(role) if role is not None else None
+    operations = batch_operations(operations)
     user, project_path, warnings, cwd = locations(project, user_config, no_project, trust_project, cwd)
     require(scope != 'project' or project_path is not None, 'Project writes require explicit --project or --trust-project inside Git; --no-project-settings disables them')
     target = user if scope == 'user' else project_path
@@ -300,21 +357,34 @@ def configure(client, action, scope, *, role=None, values=None, fields=None, app
     lock_path = target.with_name(target.name + '.lock')
     safe_path(lock_path)
     documents = {path: read_document(path)[0] for path in (user, project_path) if path is not None}
+
     def prepared(current):
-        candidate = edit(current, client, role, action, values or {}, fields, target, cwd)
-        # Validate the edited entry without higher-scope or same-scope role masks.
-        # Otherwise a project/role override could hide invalid personal/default pins.
-        scoped_candidate = validate(candidate)
-        if role is None:
-            scoped_candidate.get('clients', {}).get(client, {}).pop('roles', None)
-        scoped_project = None if scope == 'user' else project_path
-        scoped = {**documents, target: scoped_candidate}
-        assemble(client, role or 'implementation_worker', user, scoped_project, scoped, None, [], cwd)
-        staged = {**documents, target: candidate}
-        resolved = assemble(client, role or 'implementation_worker', user, project_path, staged, None, warnings, cwd)
-        return candidate, resolved
-    candidate, result = prepared(documents[target])
-    result.update(settings_path=str(target), action=action, applied=False, backup=None)
+        candidate = current
+        for operation in operations:
+            candidate = edit(candidate, client, operation['role'], operation['action'],
+                             operation['values'], operation['fields'], target, cwd, operation['stage'])
+        results = []
+        for operation in operations:
+            role, stage = operation['role'], operation['stage']
+            # Validate the edited entry before higher-scope or same-scope masks.
+            scoped_candidate = validate(candidate)
+            entry = scoped_candidate.get('clients', {}).get(client, {})
+            if role is None:
+                entry.pop('roles', None)
+                entry.pop('stages', None)
+            elif stage is None:
+                entry.pop('stages', None)
+            scoped_project = None if scope == 'user' else project_path
+            scoped = {**documents, target: scoped_candidate}
+            assemble(client, role or 'implementation-worker', user, scoped_project, scoped, None, [], cwd, stage)
+            staged = {**documents, target: candidate}
+            resolved = assemble(client, role or 'implementation-worker', user, project_path, staged, None, warnings, cwd, stage)
+            resolved.update(stage=stage, role=role, action=operation['action'])
+            results.append(resolved)
+        return candidate, results
+
+    candidate, results = prepared(documents[target])
+    result = {'results': results, 'settings_path': str(target), 'action': 'batch', 'applied': False, 'backup': None}
     if not apply:
         return result
     with open_parent(target) as parent:
@@ -323,16 +393,25 @@ def configure(client, action, scope, *, role=None, values=None, fields=None, app
             require(stat.S_ISREG(os.fstat(lock).st_mode), 'Settings lock must be a regular file')
             fcntl.flock(lock, fcntl.LOCK_EX)
             current, raw = read_document(target, parent)
-            # Refresh other participating files after acquiring the write lock.
             for path in documents:
                 if path != target:
                     documents[path] = read_document(path)[0]
-            candidate, result = prepared(current)
+            candidate, results = prepared(current)
             backup = atomic_write(target, parent, raw, candidate) if candidate != current else None
-            result.update(settings_path=str(target), action=action, applied=candidate != current, backup=backup)
+            result.update(results=results, applied=candidate != current, backup=backup)
             return result
         finally:
             os.close(lock)
+
+
+def configure(client, action, scope, *, role=None, stage=None, values=None, fields=None, apply=False,
+              project=None, user_config=None, no_project=False, trust_project=False, cwd=None):
+    """Legacy single-entry wrapper around the atomic batch API."""
+    batch = configure_batch(client, scope, [{'action': action, 'stage': stage, 'role': role,
+                                            'values': values, 'fields': fields}],
+                            apply=apply, project=project, user_config=user_config,
+                            no_project=no_project, trust_project=trust_project, cwd=cwd)
+    return {**batch['results'][0], **{key: batch[key] for key in ('settings_path', 'applied', 'backup')}}
 
 
 def main():
@@ -341,6 +420,7 @@ def main():
     parser.add_argument('--client', choices=('codex', 'claude'), required=True)
     parser.add_argument('--scope', choices=('user', 'project'))
     parser.add_argument('--role')
+    parser.add_argument('--stage', choices=STAGES)
     parser.add_argument('--tier', choices=('auto', *TIERS))
     parser.add_argument('--model')
     parser.add_argument('--effort')
@@ -360,7 +440,7 @@ def main():
         values = {key: value for key, value in values.items() if value is not None}
         if action == 'status':
             require(not values and not fields and scope is None and not apply, 'Status does not accept write fields/scope/apply')
-            args['role'] = args['role'] or 'implementation_worker'
+            args['role'] = args['role'] or 'implementation-worker'
             result = resolve(**args)
         else:
             require(scope is not None, 'Set/reset requires --scope')

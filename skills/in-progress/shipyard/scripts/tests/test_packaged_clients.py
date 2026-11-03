@@ -43,9 +43,9 @@ class PackagedClientsTests(unittest.TestCase):
                 for data in parsed.get('agents', {}).values():
                     if 'config_file' in data:
                         paths.append(Path(data['config_file']))
-            self.assertEqual(len(paths), 6)
+            self.assertEqual(len(paths), 9)
             self.assertTrue(all(p.is_file() and home in p.parents for p in paths))
-            self.assertEqual(len(list((home / '.claude/agents').glob('*.md'))), 6)
+            self.assertEqual(len(list((home / '.claude/agents').glob('*.md'))), 9)
             self.assertEqual(global_config.read_text(), 'model = "existing-model"\n')
             self.assertEqual(global_settings.read_text(), '{"existing": true}\n')
 

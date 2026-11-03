@@ -13,12 +13,12 @@ Choose settings for each **new subagent**. The primary session keeps the user's 
 Use the selector after classifying the ticket. For a read-only plan:
 
 ```bash
-python3 /path/to/shipyard/scripts/model_policy.py --client codex --role implementation_worker --complexity low --risk low
+python3 /path/to/shipyard/scripts/model_policy.py --client codex --role implementation-worker --stage implement --complexity low --risk low
 ```
 
 Resolve the skill path from the loaded installation. Load policy once per dispatch batch and reuse the selector's result for unchanged task facts. The helper makes no model calls and does not dispatch agents or modify client files.
 
-The CLI resolves saved personal/project preferences before applying current-request fields. Use `--project /authorized/repo` only for an established trusted/authorized workspace; otherwise project settings stay ignored. `--no-project-settings` keeps personal defaults while opting out of project data. See [configuration.md](configuration.md) for `/shipyard` intents, scoped saves, reset, one-shot lifetime, and policy-path precedence. The pure Python `select()` API remains stateless; callers using it directly must resolve settings themselves.
+The CLI resolves saved personal/project preferences before applying current-request fields. Pass the actual workflow `--stage` and canonical role from `stage_registry.py` so stage/agent choices are applied; omitting stage intentionally uses only generic legacy defaults. Never reuse an implementation-stage plan for verification or delivery. Use `--project /authorized/repo` only for an established trusted/authorized workspace; otherwise project settings stay ignored. `--no-project-settings` keeps personal defaults while opting out of project data. See [configuration.md](configuration.md) for scoped saves, reset, one-shot lifetime, and policy-path precedence. The pure Python `select()` API remains stateless; callers using it directly must resolve settings themselves, including stage.
 
 ## Apply only supported settings
 

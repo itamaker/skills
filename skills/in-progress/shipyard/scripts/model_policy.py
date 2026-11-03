@@ -6,14 +6,15 @@ import importlib.util
 from collections.abc import Mapping
 import json
 import os
+import runpy
 from pathlib import Path
 import re
 import sys
 
 
 TIERS = ('economy', 'balanced', 'deep')
-ROLES = ('chief_of_staff', 'project_manager', 'implementation_worker',
-         'architecture_advisor', 'code_advisor', 'visual_advisor')
+_REGISTRY = runpy.run_path(str(Path(__file__).resolve().with_name('stage_registry.py')))
+ROLES = _REGISTRY['ROLES']
 CLAUDE_SPAWN_ALIASES = {'haiku', 'sonnet', 'opus', 'fable'}
 
 
@@ -26,11 +27,26 @@ def require(condition, message):
         raise PolicyError(message)
 
 
+def role_minimums(auto):
+    values = auto.get('role_minimums')
+    require(isinstance(values, dict), 'Policy auto.role_minimums must be an object')
+    normalized = {}
+    for role, tier in values.items():
+        name = _REGISTRY['role_name'](role)
+        require(name not in normalized and tier in TIERS, 'Duplicate or invalid role minimum')
+        normalized[name] = tier
+    require(set(ROLES[:6]) <= set(normalized), 'Policy is missing a core role minimum')
+    for role in ROLES[6:]:
+        normalized.setdefault(role, 'balanced')
+    return normalized
+
+
 def validate_policy(policy):
     require(isinstance(policy, dict) and type(policy.get('version')) is int and policy.get('version') == 1, 'Policy requires version 1')
     auto = policy.get('auto', {})
     require(isinstance(auto, dict), 'Policy auto must be an object')
-    for key, expected in [('role_minimums', ROLES), ('complexity', ('low', 'medium', 'high')), ('risk', ('low', 'medium', 'high'))]:
+    role_minimums(auto)
+    for key, expected in [('complexity', ('low', 'medium', 'high')), ('risk', ('low', 'medium', 'high'))]:
         values = auto.get(key)
         require(isinstance(values, dict) and set(values) == set(expected), f'Policy auto.{key} has invalid keys')
         require(all(tier in TIERS for tier in values.values()), f'Policy auto.{key} has invalid tiers')
@@ -89,14 +105,14 @@ def claude_constraints(runtime, version, model, env, warnings):
     return constraints
 
 
-def select(policy, client, role='implementation_worker', complexity='medium', risk='low',
+def select(policy, client, role='implementation-worker', complexity='medium', risk='low',
            tier='auto', model=None, effort=None, max_tier='deep', escalate=False,
            escalation_count=0, evidence=None, runtime='unknown', claude_version=None, env=None):
     """runtime=spawn asserts the caller verified model+effort override fields in its host schema."""
     validate_policy(policy)
     require(client in ('codex', 'claude'), 'Unknown client')
     require(isinstance(role, str), 'Role must be a string')
-    role = role.replace('-', '_')
+    role = role.replace('_', '-')
     require(role in ROLES, 'Unknown role')
     require(complexity in ('low', 'medium', 'high') and risk in ('low', 'medium', 'high'), 'Invalid complexity/risk')
     require(tier in (*TIERS, 'auto') and max_tier in TIERS, 'Invalid tier/max_tier')
@@ -108,7 +124,7 @@ def select(policy, client, role='implementation_worker', complexity='medium', ri
     env = os.environ if env is None else env
     require(isinstance(env, Mapping), 'Environment must be a mapping')
     auto = policy['auto']
-    recommended = max((auto['role_minimums'][role], auto['complexity'][complexity], auto['risk'][risk]), key=TIERS.index)
+    recommended = max((role_minimums(auto)[role], auto['complexity'][complexity], auto['risk'][risk]), key=TIERS.index)
     selected_tier = recommended if tier == 'auto' else tier
     settings = policy['clients'][client]
     capabilities = settings['model_capabilities']
@@ -133,7 +149,7 @@ def select(policy, client, role='implementation_worker', complexity='medium', ri
     require(TIERS.index(selected_tier) <= TIERS.index(max_tier), f'Requested {selected_tier} exceeds hard cap {max_tier}; resolve the conflict explicitly')
     if TIERS.index(selected_tier) < TIERS.index(recommended):
         warnings.append(f'Explicit selection {selected_tier} is below recommended {recommended}')
-    if role == 'visual_advisor' and tier == 'auto' and model is None:
+    if role == 'visual-advisor' and tier == 'auto' and model is None:
         candidates = [candidate for candidate in TIERS[TIERS.index(selected_tier):]
                       if TIERS.index(candidate) <= TIERS.index(max_tier)
                       and capabilities[settings['tiers'][candidate]['model']]['vision']]
@@ -148,7 +164,7 @@ def select(policy, client, role='implementation_worker', complexity='medium', ri
     require(requested_effort in cap['efforts'], f'Effort {requested_effort} is unsupported by {requested_model}; no substitution was made')
     if effort is not None:
         reasons.append('Explicit effort override')
-    require(role != 'visual_advisor' or cap['vision'], f'{requested_model} lacks the required vision capability')
+    require(role != 'visual-advisor' or cap['vision'], f'{requested_model} lacks the required vision capability')
     method = {'unknown': 'plan_only', 'fixed': 'session_preset_required', 'spawn': 'spawn_overrides', 'session': 'session_preset'}[runtime]
     constraints = []
     if runtime == 'fixed':
@@ -171,7 +187,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--policy', type=Path)
     parser.add_argument('--client', required=True, choices=('codex', 'claude'))
-    parser.add_argument('--role', default='implementation_worker')
+    parser.add_argument('--role', default='implementation-worker')
+    parser.add_argument('--stage', help='Actual workflow stage; omitted preserves generic role defaults')
     parser.add_argument('--complexity', choices=('low', 'medium', 'high'), default='medium')
     parser.add_argument('--risk', choices=('low', 'medium', 'high'), default='low')
     parser.add_argument('--tier', choices=('auto', *TIERS))
@@ -200,14 +217,14 @@ def main():
         resolved = settings_module.resolve(
             args['client'], args['role'], project=args.pop('project'),
             user_config=args.pop('user_config'), trust_project=args.pop('trust_project'),
-            no_project=args.pop('no_project_settings'), overrides=overrides,
+            no_project=args.pop('no_project_settings'), overrides=overrides, stage=args.pop('stage'),
         )
         policy = load_policy(resolved['policy_path'])
         args.update(resolved['values'])
         result = select(policy, **args)
         result['warnings'] = list(dict.fromkeys([*resolved['warnings'], *result['warnings']]))
         result['settings'] = {
-            key: resolved[key] for key in ('policy_path', 'sources', 'layers', 'ceiling_sources')
+            key: resolved[key] for key in ('policy_path', 'sources', 'layers', 'ceiling_sources', 'stage', 'role')
         }
         print(json.dumps(result, indent=2))
     except (ValueError, OSError, TypeError, ImportError) as exc:

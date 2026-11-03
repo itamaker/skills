@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'model_settings.py'
 spec = importlib.util.spec_from_file_location('model_settings', SCRIPT)
@@ -24,12 +25,14 @@ class ModelSettingsTests(unittest.TestCase):
         self.user = self.root / 'personal/model-settings.json'
         self.project_file = self.project / '.shipyard/model-settings.json'
 
-    def write(self, path, defaults=None, roles=None, client='codex'):
+    def write(self, path, defaults=None, roles=None, client='codex', stages=None):
         document = {'version': 1, 'clients': {client: {}}}
         if defaults is not None:
             document['clients'][client]['defaults'] = defaults
         if roles is not None:
             document['clients'][client]['roles'] = roles
+        if stages is not None:
+            document['clients'][client]['stages'] = stages
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(document))
         return document
@@ -46,8 +49,171 @@ class ModelSettingsTests(unittest.TestCase):
         kwargs.setdefault('cwd', self.project)
         return settings.configure('codex', action, scope, **kwargs)
 
+    def batch(self, operations, scope='user', **kwargs):
+        kwargs.setdefault('project', self.project)
+        kwargs.setdefault('user_config', self.user)
+        kwargs.setdefault('cwd', self.project)
+        return settings.configure_batch('codex', scope, operations, **kwargs)
+
     def snapshot(self):
         return sorted(str(p.relative_to(self.root)) for p in self.root.rglob('*'))
+
+    def test_registry_has_nine_phase_targets_and_real_worker_roles(self):
+        self.assertEqual(len(settings.ROLES), 9)
+        self.assertEqual(len(settings.TARGETS), 9)
+        self.assertEqual(len(settings.STAGES), 7)
+        self.assertTrue({'verify-worker', 'ci-worker', 'deliver-worker'} <= set(settings.ROLES))
+        for stage, role in settings.TARGETS.values():
+            self.assertIn(stage, settings.STAGES)
+            self.assertIn(role, settings.ROLES)
+
+    def test_same_worker_role_can_have_isolated_phase_settings(self):
+        self.write(self.user, roles={'implementation-worker': {'tier': 'balanced'}}, stages={
+            'implement': {'implementation-worker': {'tier': 'economy'}},
+            'verify': {'implementation-worker': {'tier': 'deep'}},
+        })
+        self.assertEqual(self.resolve(stage='implement')['values']['tier'], 'economy')
+        self.assertEqual(self.resolve(stage='verify')['values']['tier'], 'deep')
+        legacy = self.resolve()
+        self.assertEqual(legacy['values']['tier'], 'balanced')
+        self.assertIsNone(legacy['stage'])
+        self.assertFalse(any('.stages.' in layer['name'] for layer in legacy['layers']))
+
+    def test_phase_precedence_and_source_names(self):
+        self.write(self.user, {'tier': 'economy'}, {'implementation-worker': {'tier': 'balanced'}}, stages={
+            'implement': {'implementation-worker': {'tier': 'deep'}},
+        })
+        self.write(self.project_file, {'tier': 'economy'}, {'implementation-worker': {'tier': 'deep'}}, stages={
+            'implement': {'implementation-worker': {'tier': 'balanced'}},
+        })
+        resolved = self.resolve(stage='implement')
+        self.assertEqual(resolved['values']['tier'], 'balanced')
+        self.assertEqual(resolved['sources']['tier']['layer'], 'project.stages.implement.implementation-worker')
+        task = self.resolve(stage='implement', overrides={'tier': 'economy'})
+        self.assertEqual(task['values']['tier'], 'economy')
+        self.assertEqual(len(task['layers']), 8)
+
+    def test_stage_aliases_normalize_and_migrate_on_write(self):
+        self.write(self.user, roles={'implementation_worker': {'effort': 'high'}}, stages={
+            'implement': {'implementation_worker': {'tier': 'balanced'}},
+        })
+        self.assertEqual(self.resolve(role='implementation_worker', stage='implement')['role'], 'implementation-worker')
+        self.change(stage='implement', role='implementation_worker', values={'tier': 'economy'}, apply=True)
+        entry = json.loads(self.user.read_text())['clients']['codex']
+        self.assertEqual(set(entry['roles']), {'implementation-worker'})
+        self.assertEqual(set(entry['stages']['implement']), {'implementation-worker'})
+
+    def test_phase_caps_cannot_be_relaxed_by_project_or_task(self):
+        self.write(self.user, stages={'implement': {'implementation-worker': {'max_tier': 'economy'}}})
+        self.write(self.project_file, {'max_tier': 'deep'}, stages={
+            'implement': {'implementation-worker': {'max_tier': None}},
+        })
+        result = self.resolve(stage='implement', overrides={'max_tier': 'deep'})
+        self.assertEqual(result['values']['max_tier'], 'economy')
+        self.assertEqual(result['sources']['max_tier']['layer'], 'user.stages.implement.implementation-worker')
+        self.assertEqual(self.resolve(stage='verify')['values']['max_tier'], 'deep')
+
+    def test_batch_invalid_second_operation_creates_nothing(self):
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, 'Unknown model'):
+            self.batch([
+                {'action': 'set', 'stage': 'implement', 'role': 'implementation-worker', 'values': {'tier': 'economy'}},
+                {'action': 'set', 'stage': 'review', 'role': 'code-advisor', 'values': {'model': 'not-real'}},
+            ], apply=True)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_batch_validates_all_final_operations_before_one_backup_replace(self):
+        self.write(self.user, {'tier': 'balanced'})
+        original = self.user.read_bytes()
+        with patch.object(settings.os, 'replace', wraps=settings.os.replace) as replace:
+            result = self.batch([
+                {'action': 'set', 'stage': 'implement', 'role': 'implementation-worker', 'values': {'tier': 'economy'}},
+                {'action': 'set', 'stage': 'review', 'role': 'code-advisor', 'values': {'tier': 'deep'}},
+            ], apply=True)
+        self.assertEqual(replace.call_count, 1)
+        self.assertEqual(Path(result['backup']).read_bytes(), original)
+        self.assertEqual(len(list(self.user.parent.glob('*.backup-*'))), 1)
+        self.assertEqual(result['action'], 'batch')
+        self.assertEqual([(r['stage'], r['role']) for r in result['results']], [('implement', 'implementation-worker'), ('review', 'code-advisor')])
+        self.assertEqual([r['values']['tier'] for r in result['results']], ['economy', 'deep'])
+
+    def test_duplicate_normalized_batch_targets_are_rejected(self):
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, 'Duplicate'):
+            self.batch([
+                {'action': 'set', 'stage': 'implement', 'role': 'implementation-worker', 'values': {'tier': 'economy'}},
+                {'action': 'reset', 'stage': 'implement', 'role': 'implementation_worker'},
+            ], apply=True)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_reset_all_registered_phase_targets_preserves_generic_and_other_client(self):
+        original = self.write(self.user, {'tier': 'balanced'}, {'code-advisor': {'effort': 'high'}})
+        original['clients']['claude'] = {'defaults': {'tier': 'deep'}}
+        self.user.write_text(json.dumps(original))
+        self.batch([{'action': 'set', 'stage': stage, 'role': role, 'values': {'tier': 'balanced'}}
+                    for stage, role in settings.TARGETS.values()], apply=True)
+        self.batch([{'action': 'reset', 'stage': stage, 'role': role}
+                    for stage, role in settings.TARGETS.values()], apply=True)
+        self.assertEqual(json.loads(self.user.read_text()), original)
+
+    def test_phase_role_reset_preserves_other_role_in_same_phase(self):
+        self.write(self.user, stages={'review': {
+            'code-advisor': {'tier': 'deep'}, 'visual-advisor': {'tier': 'balanced'},
+        }})
+        self.change('reset', stage='review', role='code-advisor', apply=True)
+        stage = json.loads(self.user.read_text())['clients']['codex']['stages']['review']
+        self.assertEqual(stage, {'visual-advisor': {'tier': 'balanced'}})
+
+    def test_phase_masks_cannot_hide_invalid_defaults_or_generic_role_saves(self):
+        self.write(self.user, stages={'review': {'code-advisor': {
+            'tier': 'balanced', 'model': None, 'effort': None,
+        }}, 'implement': {'implementation-worker': {'tier': 'balanced', 'model': None, 'effort': None}}})
+        before = self.snapshot()
+        for role in (None, 'code-advisor'):
+            with self.subTest(role=role), self.assertRaisesRegex(ValueError, 'Unknown model'):
+                self.change(role=role, values={'model': 'not-real'}, apply=True)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_project_phase_cannot_mask_invalid_user_phase(self):
+        self.write(self.project_file, stages={'implement': {'implementation-worker': {
+            'tier': 'balanced', 'model': None, 'effort': None,
+        }}})
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, 'Unknown model'):
+            self.change(stage='implement', role='implementation-worker', values={'model': 'not-real'}, apply=True)
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse(self.user.exists())
+
+    def test_invalid_stage_schema_and_missing_edit_role_are_rejected(self):
+        for stages in ({'unknown': {}}, {'implement': {'implementation-worker': {'policy': 'x'}}},
+                       {'implement': {'implementation-worker': {}, 'implementation_worker': {}}},
+                       {'implement': {'roles': {}}}):
+            with self.subTest(stages=stages), self.assertRaises(ValueError):
+                settings.validate({'version': 1, 'clients': {'codex': {'stages': stages}}})
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, 'requires a role'):
+            self.change(stage='implement', values={'tier': 'economy'}, apply=True)
+        with self.assertRaisesRegex(ValueError, 'Unknown stage'):
+            self.resolve(stage='unknown')
+        self.assertEqual(self.snapshot(), before)
+
+    def test_concurrent_batches_preserve_complete_independent_transactions(self):
+        code = ("import json,pathlib,runpy,sys; m=runpy.run_path(sys.argv[1]); "
+                "m['configure_batch']('codex','user',json.loads(sys.argv[2]),apply=True,"
+                "user_config=pathlib.Path(sys.argv[3]),project=pathlib.Path(sys.argv[4]),cwd=pathlib.Path(sys.argv[4]))")
+        processes = []
+        stages = list(settings.STAGES)
+        for i in range(0, 6, 2):
+            operations = [{'action': 'set', 'stage': stage, 'role': 'implementation-worker', 'values': {'tier': 'balanced'}}
+                          for stage in stages[i:i + 2]]
+            processes.append(subprocess.Popen([sys.executable, '-c', code, str(SCRIPT), json.dumps(operations), str(self.user), str(self.project)],
+                                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True))
+        for process in processes:
+            stdout, stderr = process.communicate(timeout=15)
+            self.assertEqual(process.returncode, 0, stderr + stdout)
+        stored = json.loads(self.user.read_text())['clients']['codex']['stages']
+        self.assertEqual(set(stored), set(stages[:6]))
+        self.assertTrue(all('implementation-worker' in role_map for role_map in stored.values()))
 
     def test_absent_settings_use_builtin_without_creating_files(self):
         before = self.snapshot()
@@ -58,8 +224,8 @@ class ModelSettingsTests(unittest.TestCase):
 
     def test_defaults_roles_projects_and_task_precedence_with_provenance(self):
         self.write(self.user, {'tier': 'economy'}, {'implementation-worker': {'tier': 'balanced'}})
-        self.write(self.project_file, {'tier': 'deep'}, {'implementation_worker': {'tier': 'balanced'}})
-        self.assertEqual(self.resolve()['sources']['tier']['layer'], 'project.roles.implementation_worker')
+        self.write(self.project_file, {'tier': 'deep'}, {'implementation-worker': {'tier': 'balanced'}})
+        self.assertEqual(self.resolve()['sources']['tier']['layer'], 'project.roles.implementation-worker')
         result = self.resolve(overrides={'tier': 'economy'})
         self.assertEqual(result['values']['tier'], 'economy')
         self.assertEqual(result['sources']['tier']['layer'], 'task')
@@ -115,11 +281,11 @@ class ModelSettingsTests(unittest.TestCase):
 
     def test_budget_only_cap_saves_without_auto_role_floor_failure(self):
         self.change(values={'max_tier': 'economy'}, apply=True)
-        result = self.resolve(role='architecture_advisor')
+        result = self.resolve(role='architecture-advisor')
         self.assertEqual(result['values'], {'tier': 'auto', 'max_tier': 'economy'})
         policy = settings.policy_module()
         with self.assertRaisesRegex(ValueError, 'hard cap'):
-            policy.select(policy.load_policy(), 'codex', role='architecture_advisor', **result['values'], env={})
+            policy.select(policy.load_policy(), 'codex', role='architecture-advisor', **result['values'], env={})
 
     def test_explicit_pin_cannot_bypass_saved_cap(self):
         self.write(self.user, {'max_tier': 'economy'})
@@ -131,30 +297,30 @@ class ModelSettingsTests(unittest.TestCase):
         self.assertEqual(self.snapshot(), before)
 
     def test_only_selected_client_and_role_are_changed(self):
-        original = self.write(self.user, {'tier': 'balanced'}, {'code_advisor': {'effort': 'high'}})
-        original['clients']['claude'] = {'defaults': {'model': 'opus'}, 'roles': {'visual_advisor': {'effort': 'low'}}}
+        original = self.write(self.user, {'tier': 'balanced'}, {'code-advisor': {'effort': 'high'}})
+        original['clients']['claude'] = {'defaults': {'model': 'opus'}, 'roles': {'visual-advisor': {'effort': 'low'}}}
         self.user.write_text(json.dumps(original))
         self.change(role='implementation-worker', values={'tier': 'economy'}, apply=True)
         stored = json.loads(self.user.read_text())
         self.assertEqual(stored['clients']['claude'], original['clients']['claude'])
         self.assertEqual(stored['clients']['codex']['defaults'], original['clients']['codex']['defaults'])
-        self.assertEqual(stored['clients']['codex']['roles']['code_advisor'], {'effort': 'high'})
-        self.change('reset', role='implementation_worker', fields=['tier'], apply=True)
-        remaining = json.loads(self.user.read_text())['clients']['codex']['roles']['implementation_worker']
+        self.assertEqual(stored['clients']['codex']['roles']['code-advisor'], {'effort': 'high'})
+        self.change('reset', role='implementation-worker', fields=['tier'], apply=True)
+        remaining = json.loads(self.user.read_text())['clients']['codex']['roles']['implementation-worker']
         self.assertEqual(remaining, {'model': None, 'effort': None})
 
     def test_reset_whole_role_or_defaults_preserves_other_entries(self):
         original = self.write(self.user, {'tier': 'balanced'}, {
-            'code_advisor': {'effort': 'high'}, 'project_manager': {'tier': 'balanced'},
+            'code-advisor': {'effort': 'high'}, 'project-manager': {'tier': 'balanced'},
         })
-        self.change('reset', role='code_advisor', apply=True)
+        self.change('reset', role='code-advisor', apply=True)
         stored = json.loads(self.user.read_text())['clients']['codex']
-        self.assertNotIn('code_advisor', stored['roles'])
+        self.assertNotIn('code-advisor', stored['roles'])
         self.assertEqual(stored['defaults'], original['clients']['codex']['defaults'])
         self.change('reset', apply=True)
         stored = json.loads(self.user.read_text())['clients']['codex']
         self.assertNotIn('defaults', stored)
-        self.assertEqual(stored['roles'], {'project_manager': {'tier': 'balanced'}})
+        self.assertEqual(stored['roles'], {'project-manager': {'tier': 'balanced'}})
 
     def test_target_directory_conflict_fails_without_writes(self):
         self.user.mkdir(parents=True)
@@ -212,7 +378,7 @@ class ModelSettingsTests(unittest.TestCase):
 
     def test_damaged_json_unknown_fields_and_duplicate_keys_fail_closed(self):
         self.user.parent.mkdir()
-        for raw in ('{invalid', '{"version":1,"command":"run"}', '{"version":1,"version":1}', '{"version":1,"clients":{"codex":{"roles":{"code_advisor":{"policy":"x"}}}}}'):
+        for raw in ('{invalid', '{"version":1,"command":"run"}', '{"version":1,"version":1}', '{"version":1,"clients":{"codex":{"roles":{"code-advisor":{"policy":"x"}}}}}'):
             with self.subTest(raw=raw):
                 self.user.write_text(raw)
                 before = self.snapshot()
@@ -266,7 +432,7 @@ class ModelSettingsTests(unittest.TestCase):
     def test_target_scope_role_cannot_mask_invalid_defaults(self):
         for scope, path in [('user', self.user), ('project', self.project_file)]:
             with self.subTest(scope=scope):
-                original = self.write(path, roles={'implementation_worker': {
+                original = self.write(path, roles={'implementation-worker': {
                     'tier': 'balanced', 'model': None, 'effort': None,
                 }})
                 before = self.snapshot()
@@ -276,7 +442,7 @@ class ModelSettingsTests(unittest.TestCase):
                 self.assertEqual(self.snapshot(), before)
 
     def test_scope_validation_does_not_remove_real_roles_or_other_clients(self):
-        original = self.write(self.user, {'tier': 'balanced'}, {'implementation_worker': {'effort': 'high'}})
+        original = self.write(self.user, {'tier': 'balanced'}, {'implementation-worker': {'effort': 'high'}})
         original['clients']['claude'] = {'defaults': {'tier': 'deep'}}
         self.user.write_text(json.dumps(original))
         self.write(self.project_file, {'tier': 'balanced', 'model': None, 'effort': None})
@@ -286,10 +452,10 @@ class ModelSettingsTests(unittest.TestCase):
         self.assertEqual(stored['clients']['claude'], original['clients']['claude'])
 
     def test_user_role_validation_ignores_higher_project_role_mask(self):
-        self.write(self.project_file, roles={'code_advisor': {'tier': 'balanced', 'model': None, 'effort': None}})
+        self.write(self.project_file, roles={'code-advisor': {'tier': 'balanced', 'model': None, 'effort': None}})
         before = self.snapshot()
         with self.assertRaisesRegex(ValueError, 'Unknown model'):
-            self.change(role='code_advisor', values={'model': 'not-a-real-model'}, apply=True)
+            self.change(role='code-advisor', values={'model': 'not-a-real-model'}, apply=True)
         self.assertEqual(self.snapshot(), before)
         self.assertFalse(self.user.exists())
 
@@ -340,7 +506,7 @@ class ModelSettingsTests(unittest.TestCase):
 
     def test_concurrent_read_modify_write_preserves_independent_roles(self):
         commands = []
-        for role in ('project_manager', 'implementation_worker', 'code_advisor', 'visual_advisor'):
+        for role in ('project-manager', 'implementation-worker', 'code-advisor', 'visual-advisor'):
             command = [sys.executable, str(SCRIPT), 'set', '--client', 'codex', '--scope', 'user', '--role', role,
                        '--tier', 'balanced', '--user-config', str(self.user), '--project', str(self.project), '--apply']
             commands.append(subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True))
@@ -348,7 +514,7 @@ class ModelSettingsTests(unittest.TestCase):
             stdout, stderr = process.communicate(timeout=15)
             self.assertEqual(process.returncode, 0, stderr + stdout)
         roles = json.loads(self.user.read_text())['clients']['codex']['roles']
-        self.assertEqual(set(roles), {'project_manager', 'implementation_worker', 'code_advisor', 'visual_advisor'})
+        self.assertEqual(set(roles), {'project-manager', 'implementation-worker', 'code-advisor', 'visual-advisor'})
         self.assertFalse(list(self.user.parent.glob('*.tmp')))
 
     def test_invalid_cli_prints_clean_error_and_preview_is_json(self):

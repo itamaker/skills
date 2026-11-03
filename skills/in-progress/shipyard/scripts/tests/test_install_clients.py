@@ -60,7 +60,7 @@ class InstallerTests(unittest.TestCase):
         marker = self.home / '.claude/skills/shipyard/SKILL.md'
         marker.unlink()
         self.install(client='codex')
-        self.assertTrue((self.home / '.codex/agents/chief_of_staff.toml').exists())
+        self.assertTrue((self.home / '.codex/agents/chief-of-staff.toml').exists())
         self.assertFalse((self.home / '.claude/agents').exists())
 
     def test_unchanged_install_is_idempotent(self):
@@ -74,8 +74,32 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(self.backups())
         self.assertTrue(all('Unchanged' in m for m in messages[1:]))
 
+    def test_managed_underscore_agent_is_backed_up_after_new_roles_install(self):
+        old = self.home / '.codex/agents/implementation_worker.toml'
+        old.parent.mkdir(parents=True)
+        data = 'name = "implementation_worker"\ndeveloper_instructions = "Read ~/.agents/skills/shipyard/SKILL.md"\n'
+        old.write_text(data)
+        self.install(apply=False)
+        self.assertTrue(old.exists())
+        self.assertFalse(self.backups())
+        self.install()
+        self.assertFalse(old.exists())
+        backups = list(old.parent.glob(old.name + '.shipyard-backup-*'))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_text(), data)
+        self.assertTrue((old.parent / 'implementation-worker.toml').exists())
+
+    def test_unowned_underscore_agent_is_retained(self):
+        old = self.home / '.codex/agents/implementation_worker.toml'
+        old.parent.mkdir(parents=True)
+        old.write_text('name = "implementation_worker"\ndeveloper_instructions = "Private role"\n')
+        original = old.read_bytes()
+        messages = self.install()
+        self.assertEqual(old.read_bytes(), original)
+        self.assertTrue(any('Retained unowned' in message for message in messages))
+
     def test_changed_regular_file_is_backed_up_and_permissions_preserved(self):
-        destination = self.home / '.codex/agents/chief_of_staff.toml'
+        destination = self.home / '.codex/agents/chief-of-staff.toml'
         destination.parent.mkdir(parents=True)
         destination.write_text('existing custom role\n')
         destination.chmod(0o600)
@@ -164,7 +188,7 @@ class InstallerTests(unittest.TestCase):
         (self.package / 'SKILL.md').write_text('shared installed skill\n')
         skill.symlink_to(self.package, target_is_directory=True)
         self.install(client='codex')
-        self.assertTrue((self.home / '.codex/agents/chief_of_staff.toml').is_file())
+        self.assertTrue((self.home / '.codex/agents/chief-of-staff.toml').is_file())
 
     def test_global_settings_and_instructions_are_untouched(self):
         paths = ['.codex/config.toml', '.codex/AGENTS.md', '.claude/settings.json', '.claude/CLAUDE.md']

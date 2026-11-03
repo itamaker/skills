@@ -5,18 +5,18 @@ import argparse
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import os
+import runpy
 import importlib.util
 import json
 from pathlib import Path
 import stat
 import sys
+import tomllib
 import uuid
 
 
-ROLES = (
-    'chief_of_staff', 'project_manager', 'implementation_worker',
-    'architecture_advisor', 'code_advisor', 'visual_advisor',
-)
+_REGISTRY = runpy.run_path(str(Path(__file__).resolve().with_name('stage_registry.py')))
+ROLES = _REGISTRY['ROLES']
 
 
 class InstallError(Exception):
@@ -149,6 +149,45 @@ def render_preset(chosen, asset, content, selection):
     return content
 
 
+def legacy_agents(home):
+    """Identify only regular, Shipyard-owned underscore aliases for migration."""
+    managed, retained = [], []
+    for role in ROLES:
+        alias = role.replace('-', '_')
+        path = home / f'.codex/agents/{alias}.toml'
+        check_parents(path, home)
+        if not path.exists() and not path.is_symlink():
+            continue
+        try:
+            if path.is_symlink() or not path.is_file():
+                raise ValueError('not a regular file')
+            content = path.read_bytes()
+            data = tomllib.loads(content.decode())
+            instructions = data.get('developer_instructions', '')
+            if data.get('name') != alias or not isinstance(instructions, str) or '/skills/shipyard/' not in instructions:
+                raise ValueError('not an owned Shipyard alias')
+        except (OSError, ValueError, UnicodeError):
+            retained.append(f'Retained unowned or linked legacy agent: {path}')
+        else:
+            managed.append((path.relative_to(home), content))
+    return managed, retained
+
+
+def retire_legacy(home, relative, expected):
+    path = home / relative
+    with parent_fd(home, relative) as parent:
+        try:
+            fd = os.open(relative.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent)
+            with os.fdopen(fd, 'rb') as stream:
+                if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode) or stream.read() != expected:
+                    return f'Retained changed legacy agent: {path}'
+        except OSError:
+            return f'Retained changed legacy agent: {path}'
+        backup = f'{relative.name}.shipyard-backup-{uuid.uuid4().hex}'
+        os.rename(relative.name, backup, src_dir_fd=parent, dst_dir_fd=parent)
+    return f'Retired managed legacy alias: {path} (backup: {path.parent / backup})'
+
+
 def install(skill_root, home, client='both', apply=False, tier='inherit', policy=None):
     """Validate every selected source and target before previewing or writing."""
     if client not in ('codex', 'claude', 'both'):
@@ -172,11 +211,12 @@ def install(skill_root, home, client='both', apply=False, tier='inherit', policy
             check_parents(destination, home)
             if (destination.exists() or destination.is_symlink()) and not (destination.is_symlink() or destination.is_file()):
                 raise InstallError(f'Destination is not a regular file or symlink: {destination}')
-            role = Path(asset).stem.replace('-', '_') if asset.startswith('agents/') else 'chief_of_staff'
+            role = Path(asset).stem.replace('_', '-') if asset.startswith('agents/') else 'chief-of-staff'
             content = render_preset(chosen, asset, source.read_bytes(), selections.get(chosen, {}).get(role))
             executable = chosen == 'codex' and asset == 'chief-of-staff'
             unchanged = same_file(destination, content, executable)
             plan.append((relative, content, executable, unchanged))
+    legacy, retained = legacy_agents(home) if 'codex' in selected else ([], [])
     messages = ['Global scope: optional native agent roles and launchers only; global instructions and settings are unchanged.']
     if selections:
         messages.append(f'Next-session preset: {tier}. Role pins intentionally override per-task selection until reinstalled with --tier inherit.')
@@ -187,6 +227,10 @@ def install(skill_root, home, client='both', apply=False, tier='inherit', policy
             messages.append(write_asset(home, relative, content, executable))
         else:
             messages.append(f'Would install global asset: {home / relative}')
+    messages.extend(retained)
+    for relative, expected in legacy:
+        messages.append(retire_legacy(home, relative, expected) if apply
+                        else f'Would retire managed legacy alias with backup: {home / relative}')
     return messages
 
 

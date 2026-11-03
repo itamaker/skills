@@ -1,16 +1,16 @@
 # Configure through Shipyard
 
-Claude Code's `/shipyard ...` and Codex's `$shipyard ...` invoke this skill with a natural-language request. These are skill-interpreted intents, not a new native slash-command parser. Follow this map before dispatching or saving settings:
+Claude Code's `/shipyard ...` and Codex's `$shipyard ...` accept both [flat stage parameters](commands.md) and natural-language requests. Parameter inputs are parsed by the bundled helper; the native clients still load the skill rather than implementing a new built-in command. For natural language, follow this map before dispatching or saving settings:
 
 | User intent | Action and lifetime |
 | --- | --- |
 | "Use deep for this task" | Keep a task override in the coordinator's task record; pass it to plans for new matching agents until task completion/cancellation. No settings file writes. |
 | "Next worker: model=sonnet, effort=high" | Reserve a one-shot override for the next matching worker/ticket. Consume only after successful agent creation returns its ID. |
-| "Save economy for this project's workers" | Preview then apply `set --scope project --role implementation_worker --tier economy` for the active client and authorized project. |
+| "Save economy for this project's workers" | Preview then apply `set --scope project --role implementation-worker --tier economy` for the active client and authorized project. |
 | "Save medium effort as my personal default" | Preview then apply `set --scope user --effort medium` for the active client. |
 | "Show active settings" | Run read-only `status`; show source layers, resolved requested preferences, policy path, and runtime constraints. Do not consume pending task overrides. |
 | "Restore auto for this task" | Replace task overrides with `tier=auto`, clearing inherited model/effort pins for that task. No native installation. |
-| "Reset the project's worker defaults" | Preview then apply `reset --scope project --role implementation_worker`; reveal any remaining personal/default layer, which might still pin a model. |
+| "Reset the project's worker defaults" | Preview then apply `reset --scope project --role implementation-worker`; reveal any remaining personal/default layer, which might still pin a model. |
 
 Infer the client from the active host. Without an explicit save intent, keep adjustments task-scoped. Ask for scope only when the request genuinely leaves persistence ambiguous. An explicit save request authorizes the helper's scoped `--apply`; do not demand another confirmation for an already authorized save. When changing both clients, validate both previews before applying and report any partial outcome.
 
@@ -28,21 +28,21 @@ Use `scripts/model_settings.py` with `status`, `set`, or `reset`. All examples b
 
 ```bash
 # Preview; add --apply for an explicitly requested save.
-python3 /path/to/shipyard/scripts/model_settings.py set --client claude --scope project --project /authorized/repo --role implementation_worker --tier economy
+python3 /path/to/shipyard/scripts/model_settings.py set --client claude --scope project --project /authorized/repo --role implementation-worker --tier economy
 python3 /path/to/shipyard/scripts/model_settings.py set --client claude --scope user --effort medium
 
 # Show the current worker's requested defaults and their sources.
-python3 /path/to/shipyard/scripts/model_settings.py status --client claude --project /authorized/repo --role implementation_worker
+python3 /path/to/shipyard/scripts/model_settings.py status --client claude --project /authorized/repo --role implementation-worker
 
 # Remove only this project's worker overrides, revealing lower layers.
-python3 /path/to/shipyard/scripts/model_settings.py reset --client claude --scope project --project /authorized/repo --role implementation_worker
+python3 /path/to/shipyard/scripts/model_settings.py reset --client claude --scope project --project /authorized/repo --role implementation-worker
 ```
 
 Personal settings live at `$XDG_CONFIG_HOME/shipyard/model-settings.json`, or `~/.config/shipyard/model-settings.json`. Project settings live at the Git root's `.shipyard/model-settings.json`; a non-Git project requires an explicit `--project`. `--user-config` selects an alternate personal file for controlled environments/tests.
 
 Only read a project's settings after the host trusts that workspace or the user's task authorizes it. Pass `--project /authorized/repo` to assert that established context, or `--trust-project` for an already trusted discovered Git root. Otherwise project settings are ignored with a diagnostic; `--no-project-settings` explicitly ignores them while keeping personal defaults. No repeated approval is needed for an already authorized workspace.
 
-Precedence is bundled policy → personal defaults → personal role → project defaults → project role → current request. Current-request fields supplied to the planner override saved preferences. Setting a tier masks lower model/effort pins; setting a model without effort uses that model's declared default effort. A `null` masks a lower value, while a missing field inherits. `reset --field ...` removes only the selected scope's field; resetting an entry never clears another client or role. Reset is distinct from deliberately setting `tier=auto`.
+Precedence is bundled policy → personal defaults → personal role → personal stage/role → project defaults → project role → project stage/role → current request. Current-request fields supplied to the planner override saved preferences. Stage/role entries are independent: changing visual design advice does not change visual review, and changing implementation does not change verification. Setting a tier masks lower model/effort pins; setting a model without effort uses that model's declared default effort. A `null` masks a lower value, while a missing field inherits. The advanced helper's `reset --field ...` removes only the selected scope's field; resetting an entry never clears another client or role. Reset is distinct from deliberately setting `tier=auto`.
 
 Every participating `max_tier` is a planning ceiling: the strictest one wins. A task override, a higher layer, or a `null` cannot relax a lower ceiling. To raise it, explicitly change/reset the scope defining it. This is not a billing limiter and does not reconfigure a primary session or native installation.
 

@@ -77,7 +77,7 @@ class PresetInstallTests(unittest.TestCase):
         path = self.home / 'custom-policy.json'
         path.write_text(json.dumps(custom))
         installer.install(SKILL, self.home, client='codex', tier='balanced', policy=path, apply=True)
-        data = tomllib.loads((self.home / '.codex/agents/implementation_worker.toml').read_text())
+        data = tomllib.loads((self.home / '.codex/agents/implementation-worker.toml').read_text())
         self.assertEqual(data['model_reasoning_effort'], 'high')
         self.assertEqual((SKILL / 'assets/model-policy.json').read_text(), original)
 

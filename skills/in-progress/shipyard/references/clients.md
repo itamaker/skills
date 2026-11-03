@@ -21,7 +21,7 @@ python3 ~/.agents/skills/shipyard/scripts/install_clients.py --client both
 python3 ~/.agents/skills/shipyard/scripts/install_clients.py --client both --apply
 ```
 
-For a Claude-only installation, run the same script from `~/.claude/skills/shipyard` with `--client claude`. The installer backs up changed named destinations, preserves unrelated/global settings, and only installs the package's six roles and optional launch files. Install scripts do not run on ordinary skill invocation. The native installer targets Linux/macOS and uses POSIX filesystem protection. Python 3.11+ is required for the Codex launcher; cleanup needs Python 3, Git and authenticated `gh`.
+For a Claude-only installation, run the same script from `~/.claude/skills/shipyard` with `--client claude`. The installer backs up changed named destinations, preserves unrelated/global settings, and only installs the package's nine roles and optional launch files. Install scripts do not run on ordinary skill invocation. The native installer targets Linux/macOS and uses POSIX filesystem protection. Python 3.11+ is required for the Codex launcher; cleanup needs Python 3, Git and authenticated `gh`.
 
 Launch the configured primary session:
 
@@ -34,6 +34,8 @@ The default installation leaves model/effort unpinned so supported hosts can app
 
 When upgrading from fixed-role assets, preview and apply the native installer again with its default `--tier inherit` to remove old pins, then start a new session. Updating the skill package alone does not rewrite already installed role files.
 
+Both clients now use the same hyphenated agent names and filenames. Legacy underscore role keys remain readable in saved settings and custom policies. During an explicit Codex setup upgrade, regular legacy agent files identified as Shipyard-owned are moved to adjacent backups after the new assets install; unowned or linked legacy files are retained and reported. Global configuration and session/authentication data are never purged.
+
 If the host cannot pass task-level overrides, preview an explicit next-session preset and then add `--apply` when wanted:
 
 ```bash
@@ -44,11 +46,14 @@ python3 ~/.agents/skills/shipyard/scripts/install_clients.py --client both --tie
 
 | Responsibility | Codex role | Claude role |
 | --- | --- | --- |
-| Primary dispatcher | `chief_of_staff` / main | `chief-of-staff` / main |
-| Workstream coordinator | `project_manager` | `project-manager` |
-| Implementation | `implementation_worker` | `implementation-worker` |
-| Architecture | `architecture_advisor` | `architecture-advisor` |
-| Code review | `code_advisor` | `code-advisor` |
-| Visual review | `visual_advisor` | `visual-advisor` |
+| Primary dispatcher | `chief-of-staff` / main | `chief-of-staff` / main |
+| Workstream coordinator | `project-manager` | `project-manager` |
+| Implementation | `implementation-worker` | `implementation-worker` |
+| Architecture | `architecture-advisor` | `architecture-advisor` |
+| Code review | `code-advisor` | `code-advisor` |
+| Visual review | `visual-advisor` | `visual-advisor` |
+| Independent verification | `verify-worker` | `verify-worker` |
+| Scoped CI repair | `ci-worker` | `ci-worker` |
+| Authorized delivery | `deliver-worker` | `deliver-worker` |
 
 Use the actual configured role name. If delegation is unavailable, the primary agent handles work serially and records required independent evidence as unavailable; it does not claim a second review happened. Advisors remain read-only. Follow the host's permission model for every action; skill invocation does not expand authorization.

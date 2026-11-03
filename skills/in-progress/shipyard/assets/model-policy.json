@@ -3,12 +3,15 @@
   "note": "Example model aliases and relative tiers; no account availability, live pricing, or effective runtime selection is asserted.",
   "auto": {
     "role_minimums": {
-      "chief_of_staff": "balanced",
-      "project_manager": "balanced",
-      "implementation_worker": "economy",
-      "architecture_advisor": "deep",
-      "code_advisor": "balanced",
-      "visual_advisor": "balanced"
+      "chief-of-staff": "balanced",
+      "project-manager": "balanced",
+      "implementation-worker": "economy",
+      "architecture-advisor": "deep",
+      "code-advisor": "balanced",
+      "visual-advisor": "balanced",
+      "verify-worker": "balanced",
+      "ci-worker": "balanced",
+      "deliver-worker": "balanced"
     },
     "complexity": {
       "low": "economy",
