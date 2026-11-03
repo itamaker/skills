@@ -1,6 +1,6 @@
 # Flat stage parameters
 
-Use the same parameters after Claude Code's `/shipyard` or Codex's `$shipyard`. Natural-language requests remain supported. A parameter input goes through `scripts/shipyard.py` for deterministic validation; unknown or conflicting flags are errors, not a request to guess another setting.
+Use the same parameters after Claude Code's `/shipyard` or Codex's `$shipyard`. Claude plugin installations use `/itamaker-skills:shipyard` instead; see [clients.md](clients.md) for installation routes. Natural-language requests remain supported. A parameter input goes through `scripts/shipyard.py` for deterministic validation; unknown or conflicting flags are errors, not a request to guess another setting.
 
 ```text
 /shipyard --implement sonnet:medium --code-review opus:high

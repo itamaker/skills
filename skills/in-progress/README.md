@@ -8,4 +8,4 @@ The plugin does not include these. Install one directly:
 npx skills@latest add itamaker/skills --skill=<name>
 ```
 
-- **[shipyard](./shipyard/SKILL.md)**: Coordinate Codex and Claude with scoped tests, model routing, CI acceptance, and safe branch cleanup.
+No skills are currently in development.

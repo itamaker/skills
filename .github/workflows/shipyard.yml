@@ -2,10 +2,10 @@ name: Shipyard
 
 on:
   pull_request:
-    paths: ['skills/in-progress/shipyard/**', 'skills/in-progress/README.md', 'scripts/check-skills.mjs', '.github/workflows/shipyard.yml']
+    paths: ['skills/dev/shipyard/**', 'skills/dev/README.md', 'README.md', 'skills.sh.json', '.claude-plugin/**', '.github/releases/**', 'scripts/check-skills.mjs', '.github/workflows/shipyard.yml']
   push:
     branches: [main]
-    paths: ['skills/in-progress/shipyard/**', 'skills/in-progress/README.md', 'scripts/check-skills.mjs', '.github/workflows/shipyard.yml']
+    paths: ['skills/dev/shipyard/**', 'skills/dev/README.md', 'README.md', 'skills.sh.json', '.claude-plugin/**', '.github/releases/**', 'scripts/check-skills.mjs', '.github/workflows/shipyard.yml']
   workflow_dispatch:
 
 permissions:
@@ -29,7 +29,50 @@ jobs:
           node-version: '22'
       - name: Check skill catalog metadata
         run: node scripts/check-skills.mjs
-      - name: Check this skill's installer and branch cleanup
+      - name: Check Shipyard configuration, native setup, and branch cleanup
         env:
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python3 -m unittest discover -s skills/in-progress/shipyard/scripts/tests -p 'test_*.py' -v
+        run: python3 -m unittest discover -s skills/dev/shipyard/scripts/tests -p 'test_*.py' -v
+
+  release:
+    name: Publish versioned release
+    needs: shipyard
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Publish the manifest version after checks pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$(node -e 'const v=require("./.claude-plugin/plugin.json").version; if (!/^\d+\.\d+\.\d+$/.test(v)) process.exit(1); process.stdout.write(`v${v}`)')"
+          notes=".github/releases/$tag.md"
+          if [[ ! -f "$notes" ]]; then
+            echo "No release notes for $tag; this revision does not request a release."
+            exit 0
+          fi
+          response="$RUNNER_TEMP/shipyard-release-response"
+          if gh api --include "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$response"; then
+            echo "Release $tag already exists; leaving it unchanged."
+            exit 0
+          fi
+          if [[ "$(awk 'NR == 1 { print $2 }' "$response")" != 404 ]]; then
+            echo "Could not verify release absence; stopping publication."
+            exit 1
+          fi
+          if git show-ref --verify --quiet "refs/tags/$tag"; then
+            if [[ "$(git rev-parse "refs/tags/$tag^{commit}")" != "$GITHUB_SHA" ]]; then
+              echo "Existing tag $tag points to a different commit; stopping publication."
+              exit 1
+            fi
+          fi
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "$tag" --notes-file "$notes" --latest

@@ -7,7 +7,7 @@ description: Coordinate scoped agent delivery across Codex and Claude Code. Use 
 
 The main conversation owns the user's goal, priorities, integration, and final acceptance. Handle small tasks directly; introduce workers or a PM only when their independent work saves more time than the handoff costs.
 
-If the text after `/shipyard` or `$shipyard` begins with `--`, follow [commands.md](references/commands.md) first and pass the literal arguments to the flat-parameter helper. Do not reinterpret malformed flags as natural language or interpolate them into shell code. With no parameters, continue the normal workflow; natural-language requests remain available.
+If the text after the skill name (`/shipyard`, `/itamaker-skills:shipyard` in the Claude plugin, or `$shipyard`) begins with `--`, follow [commands.md](references/commands.md) first and pass the literal arguments to the flat-parameter helper. Do not reinterpret malformed flags as natural language or interpolate them into shell code. With no parameters, continue the normal workflow; natural-language requests remain available.
 
 ## Load only your path
 

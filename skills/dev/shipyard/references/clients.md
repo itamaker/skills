@@ -1,14 +1,16 @@
 # Client installation and roles
 
-This skill is maintained in `itamaker/skills/skills/in-progress/shipyard`. This is the development location, excluded from the promoted Claude plugin bundle and release catalog. Development here does not trigger a release. Once the source is available on the selected repository ref, install it directly for development use:
+Shipyard is published from `itamaker/skills/skills/dev/shipyard` in the stable skill catalog and Claude Code plugin. Pick one installation route. The repository's Claude plugin exposes `/itamaker-skills:shipyard`; a direct skill installation exposes `/shipyard` in Claude Code and `$shipyard` in Codex. Both accept the same parameters. See the [Claude plugin command convention](https://code.claude.com/docs/en/plugins).
+
+For the optional native roles, choose a direct global skill installation instead of the Claude plugin: the bundled role templates reference user-global skill paths. Install the skill directly:
 
 ```bash
 npx skills@latest add itamaker/skills --skill=shipyard
 ```
 
-Select **Global** installation scope and both Codex and Claude Code when asked. Project scope does not satisfy the native adapters' user-global paths. Codex's personal entry is `~/.agents/skills/shipyard/SKILL.md`; Claude's is `~/.claude/skills/shipyard/SKILL.md`. For noninteractive installs, explicitly add `-g` as well as your client selections; `--yes` alone defaults to project scope. For a maintainer checkout, the repository's `scripts/link-skills.sh` links all eligible skills, including this one, into both directories; inspect existing links before running it because that script replaces existing destinations. Pick one installation route to avoid duplicate skill discovery.
+Select **Global** installation scope and the clients you use when asked. For setup with `--client both`, select both Codex and Claude Code. Project scope does not satisfy the native adapters' user-global paths. Codex's personal entry is `~/.agents/skills/shipyard/SKILL.md`; Claude's is `~/.claude/skills/shipyard/SKILL.md`. For noninteractive installs, explicitly add `-g` as well as your client selections; `--yes` alone defaults to project scope. For a maintainer checkout, the repository's `scripts/link-skills.sh` links all eligible skills, including this one, into both directories; inspect existing links before running it because that script replaces existing destinations. Pick one installation route to avoid duplicate skill discovery.
 
-Future publication and installation belong to the skills repository. Promote to a stable bucket and update that repository's catalog/plugin metadata only as a separate authorized release task. Native role sources are part of this skill, not a separate dotfiles dependency.
+Publication and installation are managed by the skills repository. Native role sources are part of this skill, not a separate dotfiles dependency. Installing the Claude plugin makes the skill available; native role installation remains an explicit setup step through the direct global route above.
 
 ## Optional native role setup
 
