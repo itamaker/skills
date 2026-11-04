@@ -8,9 +8,10 @@ T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/bin" "$T/apps" "$T/home"
 LOG="$T/calls.log"
+TAB=$'\t'
 
 # Stand-ins: each records its name and arguments, one call per line.
-for c in open osascript xdg-open gtk-launch pkill google-chrome google-chrome-stable myeditor; do
+for c in open osascript xdg-open gtk-launch pkill google-chrome google-chrome-stable myeditor flatpak; do
   printf '#!/bin/sh\nprintf "%s" "%s" >>"%s"\nfor a in "$@"; do printf " [%%s]" "$a" >>"%s"; done\nprintf "\\n" >>"%s"\n' \
     '%s' "$c" "$LOG" "$LOG" "$LOG" >"$T/bin/$c"
   chmod +x "$T/bin/$c"
@@ -89,7 +90,7 @@ else
   : >"$LOG"
   expect_rc "run url in browser" 0 run gmail; sleep 0.3; expect_log "linux url goes to the browser" "google-chrome [https://mail.google.com/other]"
   expect_rc "run path" 0 run work;         expect_log "linux path uses xdg-open" "xdg-open [$T]"
-  expect_rc "run quit" 0 run chrome-off;   expect_log "linux quit uses pkill -x" "pkill [-x] [google-chrome]"
+  expect_rc "run quit" 0 run chrome-off;   expect_log "linux quit uses pkill -x" "pkill [-x] [--] [google-chrome]"
 fi
 # a value that looks like shell code must arrive as one literal argument
 : >"$LOG"
@@ -268,6 +269,26 @@ expect_rc "outfile refuses folders" 2 outfile ../x.svg
 expect_rc "outfile refuses dotfiles" 2 outfile .bashrc
 expect_rc "outfile needs a name" 1 outfile
 BP_OUT="$T/out" bash "$BP" outfile a.svg | grep -qx "$T/out/a.svg" && ok || bad "BP_OUT overrides the folder"
+
+# --- review fixes: locking, wrappers, quit targets, reserved words
+rm -f "$BP_HOME/aliases.tsv"
+for i in 1 2 3 4 5 6 7 8; do bash "$BP" add "par$i" url "https://par$i.test" >/dev/null 2>&1 & done
+wait
+[ "$(store_lines)" = 8 ] && ok || bad "eight parallel adds all landed" "lines: $(store_lines)"
+[ ! -e "$BP_HOME/.lock" ] && ok || bad "the lock is released"
+expect_rc "clear removes everything" 0 clear --yes
+[ "$(store_lines)" = 0 ] && ok || bad "clear emptied the store"
+expect_rc "stop is a reserved alias" 2 add stop url https://stop.test
+expect_rc "quit refuses a session process" 2 add k9 quit sshd
+expect_rc "launch quit refuses a shell" 2 launch quit bash
+expect_rc "launch quit refuses an option-like name" 2 launch quit -9
+expect_rc "add quit refuses an option-like name" 2 add k10 quit -9
+if [ "$IS_MAC" = 0 ]; then
+  printf '[Desktop Entry]\nType=Application\nName=Wrapped App\nExec=/usr/bin/flatpak run --branch=stable org.example.Wrapped %%U\n' >"$T/apps/org.example.Wrapped.desktop"
+  expect_rc "flatpak launcher" 0 find "Wrapped App"
+  expect_out "wrapper launchers use the desktop id" "org.example.Wrapped"
+  case "$OUT" in *"$TAB"flatpak*) bad "target must not be the wrapper command" "$OUT" ;; *) ok ;; esac
+fi
 
 # --- helpers
 expect_rc "alias: Google Chrome" 0 alias "Google Chrome"; [ "$OUT" = chrome ] && ok || bad "alias for Google Chrome" "$OUT"

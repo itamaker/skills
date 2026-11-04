@@ -12,9 +12,36 @@ STORE="$BP_HOME/aliases.tsv"
 TAB=$'\t'
 NL=$'\n'
 OS="$(uname -s)"
-RESERVED="add rm ls find scan auto"
+RESERVED="add rm ls find scan auto stop"
 
 die() { code=$1; shift; printf 'bp: %s\n' "$*" >&2; exit "$code"; }
+
+# One writer at a time: parallel bp.sh calls must not overwrite each other's changes.
+LOCKDIR=""
+lock() {
+  mkdir -p "$BP_HOME" 2>/dev/null
+  l="$BP_HOME/.lock"; tries=0
+  while ! mkdir "$l" 2>/dev/null; do
+    # a lock older than a minute belongs to a process that died
+    if [ -n "$(find "$l" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then rmdir "$l" 2>/dev/null; continue; fi
+    tries=$((tries + 1))
+    [ "$tries" -le 100 ] || die 1 "the shortcut file is busy (delete $l if no bp command is running)"
+    sleep 0.1
+  done
+  LOCKDIR="$l"
+  trap 'rmdir "$LOCKDIR" 2>/dev/null' EXIT
+}
+
+# Session-critical processes are never quit, and a target is never read as an option.
+refuse_quit() {
+  case "$1" in
+    -*) die 2 "a quit target must not start with a dash" ;;
+    systemd | init | launchd | loginwindow | WindowServer | Finder | Dock | SystemUIServer | Xorg | Xwayland | \
+    gnome-shell | plasmashell | kwin_x11 | kwin_wayland | sshd | dbus-daemon | dbus-broker | pipewire | \
+    pulseaudio | login | sudo | bash | zsh | fish | sh | dash)
+      die 2 "refusing to quit a system or shell process: $1" ;;
+  esac
+}
 
 # ---------- validation ----------
 
@@ -114,8 +141,12 @@ apps_list() { # name<TAB>target-to-save, sorted
   else
     linux_apps | while IFS="$TAB" read -r n id cmd; do
       t="$id"; b="${cmd##*/}"
-      if [ -n "$b" ] && command -v "$b" >/dev/null 2>&1; then t="$b"
-      elif [ -n "$cmd" ] && [ -x "$cmd" ]; then t="$cmd"; fi
+      case "$b" in
+        flatpak | snap | sh | bash | dash | python | python3 | java | wine | xdg-open | gtk-launch) ;; # a wrapper: use the desktop id
+        *)
+          if [ -n "$b" ] && command -v "$b" >/dev/null 2>&1; then t="$b"
+          elif [ -n "$cmd" ] && [ -x "$cmd" ]; then t="$cmd"; fi ;;
+      esac
       printf '%s\t%s\n' "$n" "$t"
     done | sort -u
   fi
@@ -130,7 +161,8 @@ app_exists() {
     case "$1" in */*) return 1 ;; esac
     app_dirs | while IFS= read -r d; do [ -e "$d/$1.app" ] && echo y; done | grep -q y
   else
-    apps_list | cut -f2 | grep -qxF -- "$1" && return 0
+    [ -n "${APPS_CACHE+x}" ] || APPS_CACHE="$(apps_list)"
+    printf '%s\n' "$APPS_CACHE" | cut -f2 | grep -qxF -- "$1" && return 0
     case "$1" in */*) return 1 ;; esac
     app_dirs | while IFS= read -r d; do [ -e "$d/$1.desktop" ] && echo y; done | grep -q y
   fi
@@ -169,7 +201,7 @@ launch() { # kind target [with]
         osascript -e 'on run argv' -e 'tell application (item 1 of argv) to quit' -e 'end run' "$target" ||
           die 5 "could not quit: $target"
       else
-        pkill -x "${target:0:15}" || die 5 "no running process named $target"
+        pkill -x -- "${target:0:15}" || die 5 "no running process named $target"
       fi ;;
     *) die 2 "unknown kind: $kind" ;;
   esac
@@ -298,6 +330,7 @@ cmd_launch() { # open without saving: launch <kind> <target> [with]
     url) url_scheme_ok "$2" || die 2 "unsupported link scheme: $2" ;;
     path) case "$2" in /*) ;; *) die 2 "a path must be absolute (expand ~ first)" ;; esac ;;
     app) app_exists "$2" || die 4 "no installed app matches '$2' (try: find <text>)" ;;
+    quit) refuse_quit "$2" ;;
   esac
   if [ -n "${3:-}" ]; then
     case "$1" in url | path) ;; *) die 2 "'with' only applies to url and path" ;; esac
@@ -366,8 +399,10 @@ cmd_add() {
       [ -e "$target" ] || die 4 "path does not exist: $target" ;;
     app)
       app_exists "$target" || die 4 "no installed app matches '$target' (try: find <text>)" ;;
+    quit) refuse_quit "$target" ;;
   esac
 
+  lock
   if existing="$(alias_for "$kind" "$target" "$with")"; then
     echo "already saved as $existing"; return 0
   fi
@@ -393,6 +428,7 @@ cmd_rm() {
   get_line "$1" >/dev/null || die 1 "no such alias: $1"
   refs="$(M="$1" awk -F'\t' '$2 == "group" { n = split($3, a, ","); for (i = 1; i <= n; i++) if (a[i] == ENVIRON["M"]) print $1 }' "$STORE" | tr '\n' ' ')"
   [ -z "$refs" ] || echo "note: still listed in group(s): $refs" >&2
+  lock
   tmp="$STORE.tmp.$$"
   A="$1" awk -F'\t' '$1 != ENVIRON["A"]' "$STORE" >"$tmp" && mv "$tmp" "$STORE"
   echo "removed: $1"
@@ -400,7 +436,10 @@ cmd_rm() {
 
 cmd_clear() {
   [ "${1:-}" = "--yes" ] || die 1 "usage: clear --yes   (removes every shortcut)"
-  : >"$STORE" 2>/dev/null || true
+  if [ -f "$STORE" ]; then
+    lock
+    : >"$STORE" || die 1 "could not clear $STORE"
+  fi
   echo "all shortcuts removed"
 }
 
