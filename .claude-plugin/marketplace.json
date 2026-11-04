@@ -9,7 +9,7 @@
     {
       "name": "itamaker-skills",
       "source": "./",
-      "description": "Agent delivery, tooling and evaluation, web page export, a cloud browser and design tools, and Go workspace management.",
+      "description": "Agent delivery, tooling and evaluation, web page export, a cloud browser and design tools, Go workspace management, and local app shortcuts.",
       "category": "development",
       "keywords": [
         "agent-skills",

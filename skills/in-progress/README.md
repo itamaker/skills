@@ -8,4 +8,4 @@ The plugin does not include these. Install one directly:
 npx skills@latest add itamaker/skills --skill=<name>
 ```
 
-- **[bp](./bp/SKILL.md)**: Do tasks across local apps on macOS or Linux, find installed apps, and save each app and site as a nickname for next time.
+No skills are currently in development.
