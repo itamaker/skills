@@ -271,13 +271,20 @@ expect_rc "outfile needs a name" 1 outfile
 BP_OUT="$T/out" bash "$BP" outfile a.svg | grep -qx "$T/out/a.svg" && ok || bad "BP_OUT overrides the folder"
 
 # --- review fixes: locking, wrappers, quit targets, reserved words
-rm -f "$BP_HOME/aliases.tsv"
 mkdir -p "$T/par"
-export BP_TRACE="$T/lock.trace"; : >"$BP_TRACE"
-for i in 1 2 3 4 5 6 7 8; do bash "$BP" add "par$i" url "https://par$i.test" >"$T/par/$i.out" 2>&1 & done
-wait
-unset BP_TRACE
-[ "$(store_lines)" = 8 ] && ok || bad "eight parallel adds all landed" "lines: $(store_lines); store: $(tr '\t\n' ' |' <"$BP_HOME/aliases.tsv"); lock trace (time pid event): $(sort "$T/lock.trace" | tr '\n' '|')"
+lost=""
+for round in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  rm -f "$BP_HOME/aliases.tsv"
+  export BP_TRACE="$T/lock.trace"; : >"$BP_TRACE"
+  for i in 1 2 3 4 5 6 7 8; do bash "$BP" add "par$i" url "https://par$i.test" >"$T/par/$i.out" 2>&1 & done
+  wait
+  unset BP_TRACE
+  if [ "$(store_lines)" != 8 ]; then
+    lost="round $round: lines $(store_lines); store: $(tr '\t\n' ' |' <"$BP_HOME/aliases.tsv"); lock trace (time pid event): $(sort "$T/lock.trace" | tr '\n' '|')"
+    break
+  fi
+done
+[ -z "$lost" ] && ok || bad "parallel adds in 15 rounds all landed" "$lost"
 [ ! -e "$BP_HOME/.lock" ] && ok || bad "the lock is released"
 expect_rc "clear removes everything" 0 clear --yes
 [ "$(store_lines)" = 0 ] && ok || bad "clear emptied the store"
