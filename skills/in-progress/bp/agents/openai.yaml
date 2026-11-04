@@ -1,4 +1,4 @@
 interface:
   display_name: "bp"
-  short_description: "Do tasks across local apps and remember them as shortcuts"
+  short_description: "Find local apps, run cross-app tasks, save shortcuts"
   default_prompt: "Use $bp to open my apps for this task and save them as shortcuts."
