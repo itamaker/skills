@@ -1,19 +1,19 @@
 # Everyday scenarios
 
-How common computer jobs map onto `scripts/bp.sh` (`$BP` below). Read the row that matches; most tasks are one or two commands. Each `launch` opens without saving; add `--auto` saves only where the table says so.
+How common computer jobs map onto `scripts/bp.sh` (`$BP` below). Read the row that matches; most tasks are one or two commands. `launch` opens without saving; whether to save afterwards follows the Auto-save rules in SKILL.md.
 
 | The user wants | Do |
 |---|---|
 | **Start a work setup** ("上班", "start my day") | Save once: `$BP add work group chrome,gmail,slack`. Then `/bp work` is `$BP run work`; members open in order and a failing one is reported without stopping the rest. Groups hold aliases, so save the members first. |
-| **End the day / close the apps** | `$BP stop work` asks every app in the group to quit. One app: `$BP stop slack`. Warn first if an app may hold unsaved work. |
+| **End the day / close the apps** | `$BP stop work` asks every app in the group to quit. One app: `$BP stop slack`. Warn first if an app may hold unsaved work. On Linux this quits by process name, which can differ from the launch command (Chrome's process is `chrome`): if it reports nothing to quit, save a `quit` shortcut with the real process name. |
 | **Open a folder** (Downloads, Desktop, a project) | `$BP launch path /absolute/path`. Expand `~`, `~/Downloads`, `~/Desktop`, `~/Documents` to the real home path first. |
 | **Open a project in the editor** | `$BP launch path /abs/project "<editor>"`, with the editor name or command `find` printed. Save it if they say it is a regular one: `$BP add proj path /abs/project "<editor>"`. |
 | **Open a file in a given app** | The same: `$BP launch path /abs/file.pdf "<app>"`. With no app named, the system default opens it. |
 | **Find a file** ("the pdf I downloaded", "my report") | `$BP recent 10` covers Downloads, Desktop and Documents; `$BP files <text> [folder]` searches by name anywhere else. For "latest" or "recent", take the newest file of the type asked (a PDF means a `.pdf`, even if a photo is newer) and open it, naming the runner-up so the user can redirect. For a name with several different matches, show up to five with their dates and ask. |
-| **Draw something** ("open the drawing board and draw a cat") | See **Make something, then open it** below. |
-| **Write a note, a list, a document** | The same: write the file yourself, then open it in an editor or notes app. |
-| **Make a table** | The same, as a `.csv`, opened in a spreadsheet app. |
-| **Open "a" kind of app** (a drawing board, a browser, a terminal, a music player) | `$BP category <kind>`: drawing, browser, editor, terminal, mail, chat, music, video, notes, office, spreadsheet, files, settings. Several matches: pick the obvious one, or ask. None: say so and offer a web version (see [deep-links.md](deep-links.md)). |
+| **Draw something** ("open the drawing board and draw a dog") | Work live in the app: **Work live in an app** below. This needs the session's computer-control tools. |
+| **Write a note, a list, a document** | Typed live in the app when the user names an app to write in; a file (**Make a file, then open it**) when they want a file. |
+| **Make a table** | The same: live in the spreadsheet app if asked, otherwise a `.csv` opened in one. |
+| **Open "a" kind of app** (a drawing board, a browser, a terminal, a music player) | `$BP category <kind>`: drawing, browser, editor, terminal, mail, chat, music, video, notes, office, spreadsheet, files, settings. Several matches: pick the most common one and name the others. None: say so and offer a web version (see [deep-links.md](deep-links.md)). |
 | **Is X running? / open it only if not** | `$BP running <process name>`. The process name can differ from the app name (Chrome is `chrome`), so a "no" is a hint, not proof. |
 | **Join a meeting** | `$BP launch url "<meeting link>"`: `https://` links open in the browser, `zoommtg://` and `msteams:` open the app. A meeting link names one meeting, so never auto-save it; save by hand only if the user says it recurs. |
 | **Write an email** | Default mail app: `$BP launch url "mailto:<to>?subject=<s>&body=<b>"` with values from `$BP urlenc`. In Gmail instead: the draft link in [deep-links.md](deep-links.md). Sending is the user's call unless the task says send. |
@@ -30,7 +30,7 @@ How common computer jobs map onto `scripts/bp.sh` (`$BP` below). Read the row th
 
 When the user asks for something to be drawn or typed in an app ("open the drawing board and draw a dog", "write it in Notes"), do it in the app, where they can watch. This needs the session's computer-control tools (screenshots, mouse and keyboard). Check your own tool list for them: names such as `computer_*` or `computer-use`, or a single tool that switches computer control on, which you should call. Follow any instructions that come with them before the first step.
 
-1. **Open the app.** `$BP category drawing` lists drawing boards and whiteboards (画板, 白板, 画图); Prefer freehand apps: Freeform, Krita, Drawing, MyPaint, Pixelmator, GIMP. Vector editors such as Inkscape and LibreOffice Draw need a tool picked for every shape, so use them last. Then `$BP launch app <target>`, or `$BP run <alias>` if it is saved. A whiteboard in the browser is a good fallback: `https://excalidraw.com` (see [deep-links.md](deep-links.md)); there the key `p` selects the freehand pencil.
+1. **Open the app.** `$BP category drawing` lists drawing boards and whiteboards (画板, 白板, 画图). Prefer freehand apps: Freeform, Krita, Drawing, MyPaint, Pixelmator, GIMP. Vector editors such as Inkscape and LibreOffice Draw need a tool picked for every shape, so use them last. Then `$BP launch app <target>`, or `$BP run <alias>` if it is saved. A whiteboard in the browser is a good fallback: `https://excalidraw.com` (see [deep-links.md](deep-links.md)); there the key `p` selects the freehand pencil.
 2. **Look first.** Take a screenshot and find the canvas. If a new-document dialog is open, accept the defaults. Choose a plain pencil or pen and a dark color. Stay in that app's window; if a dialog asks about saving, signing in, permissions or updates, stop and ask.
 3. **Plan the picture in canvas coordinates** before touching the mouse. For a dog: a body ellipse, a round head, two ears, eyes, a nose, four legs, a tail. Write each stroke as a list of points, a circle or ellipse as 12 to 16 points around its edge.
 4. **Draw stroke by stroke,** dragging along the points. Take a screenshot every few strokes to check position and size. Undo (Cmd or Ctrl+Z) a wrong stroke instead of erasing. About 15 to 30 strokes make a recognizable picture; stop when it is one. Draw ears, legs and other pointed parts as one closed outline (go back to the start point) so they read as shapes, and keep every part inside the canvas.

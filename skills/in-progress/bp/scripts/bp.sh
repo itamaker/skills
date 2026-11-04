@@ -37,8 +37,7 @@ valid_kind() { case "$1" in app | url | path | quit | group) return 0 ;; esac; r
 url_scheme_ok() {
   case "$1" in
     http://* | https://* | mailto:* | tel:* | sms:* | facetime:* | zoommtg://* | zoomus://* | \
-    msteams:* | slack://* | spotify:* | vscode://* | obsidian://* | notion://* | discord://* | \
-    tg://* | x-apple.systempreferences:*) return 0 ;;
+    msteams:* | slack://* | spotify:* | x-apple.systempreferences:*) return 0 ;;
   esac
   return 1
 }
@@ -122,11 +121,17 @@ apps_list() { # name<TAB>target-to-save, sorted
   fi
 }
 
+# True only for an installed GUI app: an .app bundle on macOS; on Linux a command or id that a
+# desktop launcher lists. Any other command on PATH (rm, sh, ...) is refused on purpose, since a
+# saved app or "with" value is executed.
 app_exists() {
+  [ -n "$1" ] || return 1
   if [ "$OS" = Darwin ]; then
+    case "$1" in */*) return 1 ;; esac
     app_dirs | while IFS= read -r d; do [ -e "$d/$1.app" ] && echo y; done | grep -q y
   else
-    command -v "$1" >/dev/null 2>&1 && return 0
+    apps_list | cut -f2 | grep -qxF -- "$1" && return 0
+    case "$1" in */*) return 1 ;; esac
     app_dirs | while IFS= read -r d; do [ -e "$d/$1.desktop" ] && echo y; done | grep -q y
   fi
 }
@@ -164,7 +169,7 @@ launch() { # kind target [with]
         osascript -e 'on run argv' -e 'tell application (item 1 of argv) to quit' -e 'end run' "$target" ||
           die 5 "could not quit: $target"
       else
-        pkill -x "$target" || die 5 "no running process named $target"
+        pkill -x "${target:0:15}" || die 5 "no running process named $target"
       fi ;;
     *) die 2 "unknown kind: $kind" ;;
   esac
@@ -196,7 +201,7 @@ EOF
 run_group() { # members: open each in order, report failures, keep going
   failed=0
   err="$BP_HOME/.err.$$"
-  old_ifs="$IFS"; IFS=','; set -- $1; IFS="$old_ifs"
+  old_ifs="$IFS"; IFS=','; set -f; set -- $1; set +f; IFS="$old_ifs"
   for m in "$@"; do
     if ml="$(get_line "$m")"; then
       IFS="$TAB" read -r _ k t w <<EOF
@@ -225,7 +230,7 @@ EOF
   case "$kind" in
     app | quit) ( launch quit "$target" ) && echo "asked $target to quit" ;;
     group)
-      old_ifs="$IFS"; IFS=','; set -- $target; IFS="$old_ifs"
+      old_ifs="$IFS"; IFS=','; set -f; set -- $target; set +f; IFS="$old_ifs"
       for m in "$@"; do
         ml="$(get_line "$m")" || continue
         IFS="$TAB" read -r _ k t _w <<EOF
@@ -250,7 +255,7 @@ cmd_running() {
 cmd_recent() { # newest files in Downloads, Desktop and Documents
   n="${1:-10}"
   case "$n" in '' | *[!0-9]*) die 2 "usage: recent [count]" ;; esac
-  tmp="$(mktemp)" || die 2 "cannot create a temporary file"
+  tmp="$(mktemp "${TMPDIR:-/tmp}/bp.XXXXXX")" || die 2 "cannot create a temporary file"
   dirs="${BP_RECENT_DIRS:-$HOME/Downloads:$HOME/Desktop:$HOME/Documents}"
   printf '%s\n' "$dirs" | tr ':' '\n' | while IFS= read -r d; do
     [ -d "$d" ] || continue
@@ -292,7 +297,12 @@ cmd_launch() { # open without saving: launch <kind> <target> [with]
   case "$1" in
     url) url_scheme_ok "$2" || die 2 "unsupported link scheme: $2" ;;
     path) case "$2" in /*) ;; *) die 2 "a path must be absolute (expand ~ first)" ;; esac ;;
+    app) app_exists "$2" || die 4 "no installed app matches '$2' (try: find <text>)" ;;
   esac
+  if [ -n "${3:-}" ]; then
+    case "$1" in url | path) ;; *) die 2 "'with' only applies to url and path" ;; esac
+    app_exists "$3" || die 4 "'with' app not found on this machine: $3 (use the name or command that 'find' prints)"
+  fi
   launch "$1" "$2" "${3:-}"
   echo "asked to open $1 $2${3:+ in $3}"
 }
@@ -341,13 +351,13 @@ cmd_add() {
     group)
       [ "$auto" = 0 ] || die 6 "not saved: groups are never created by auto-save"
       case "$target" in *,,* | ,* | *,) die 2 "a group is a comma-separated list of aliases" ;; esac
-      old_ifs="$IFS"; IFS=','; set -- $target; IFS="$old_ifs"
+      old_ifs="$IFS"; IFS=','; set -f; set -- $target; set +f; IFS="$old_ifs"
       for m in "$@"; do
         ml="$(get_line "$m")" || die 4 "group member is not a saved alias: $m"
         case "$ml" in *"${TAB}group${TAB}"*) die 2 "a group cannot contain another group: $m" ;; esac
       done ;;
     url)
-      url_scheme_ok "$target" || die 2 "unsupported link scheme (allowed: http, https, mailto, tel, sms, facetime, zoommtg, zoomus, msteams, slack, spotify, vscode, obsidian, notion, discord, tg, x-apple.systempreferences)"
+      url_scheme_ok "$target" || die 2 "unsupported link scheme (allowed: http, https, mailto, tel, sms, facetime, zoommtg, zoomus, msteams, slack, spotify, x-apple.systempreferences)"
       if [ "$auto" = 1 ] && ! url_ok_for_auto "$target"; then
         die 6 "not saved: auto-save keeps only plain entry points (no query, fragment or credentials)"
       fi ;;

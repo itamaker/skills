@@ -41,7 +41,7 @@ Example: "/bp open Chrome, go to Gmail, send Li the report, then tell Wang in Sl
 
 The task the user typed authorizes exactly the actions in it. If they gave no exact recipient or text for a message, show both and get a yes before sending. Send or post nothing the task did not ask for, and run a saved shortcut only when the user or their task calls for it. At a login, 2FA or CAPTCHA, stop and hand over.
 
-If a command exits non-zero, report the reason it printed instead of claiming success. `xdg-open` needs a desktop session, so over SSH or in a container its failure is the real answer. A success message means the system was asked to open the thing, not that a window appeared: say "opened" only for that. On Linux an app started in the background reports success even if it dies at once; `$BP running <name>` can check, but a process often has a different name from its command (Chrome's is `chrome`), so a "not running" answer is not proof and you should say "asked to open" instead.
+If a command exits non-zero, report the reason it printed instead of claiming success. `xdg-open` needs a desktop session, so over SSH or in a container its failure is the real answer. A success message means the system was asked to open the thing, not that a window appeared, so say "asked to open" unless you saw it. On Linux an app started in the background reports success even if it dies at once; `$BP running <name>` can check, but a process often has a different name from its command (Chrome's is `chrome`), so a "not running" answer is not proof and you should say "asked to open" instead.
 
 ## Finding apps
 
@@ -63,7 +63,7 @@ $BP add morning group chrome,gmail,slack
 
 A group lists saved aliases only, so save each member first (a folder gets its own alias, such as `projects`), then add the group, one command after another.
 
-Exit 3 means the alias is taken: show the old line it printed and ask before rerunning with `--replace`. Exit 4 means the app, `with` app or path is not on this machine: run `$BP find` and ask for the exact name. Values are written for this machine's OS.
+Exit 3 means the alias is taken: show the old line it printed and ask before rerunning with `--replace`. Exit 4 means the app, `with` app or path is not on this machine: run `$BP find` and ask for the exact name. On Linux an app or `with` value must be one a desktop launcher lists, and a plain command such as `rm` is refused. Values are written for this machine's OS.
 
 ### Auto-save
 

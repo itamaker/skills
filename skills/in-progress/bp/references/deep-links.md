@@ -23,7 +23,7 @@ Build the URL, then open it without saving (it holds a query): `$BP launch url "
 | Mail app draft | `mailto:<to>?subject=<s>&body=<b>` (opens the system mail app, not a browser) |
 | Spotify search | `spotify:search:<q>` (opens the Spotify app) |
 
-Percent-encode every `<...>` value with `$BP urlenc "<text>"`, including non-ASCII text (`老高` becomes `%E8%80%81%E9%AB%98`). Only the links the script allows can be launched or saved: web addresses, `mailto:`, `tel:`, `sms:`, `facetime:`, `zoommtg://`, `zoomus://`, `msteams:`, `slack://`, `spotify:`, `vscode://`, `obsidian://`, `notion://`, `discord://`, `tg://` and `x-apple.systempreferences:`.
+Percent-encode every `<...>` value with `$BP urlenc "<text>"`, including non-ASCII text (`老高` becomes `%E8%80%81%E9%AB%98`). Only the links the script allows can be launched or saved: web addresses, `mailto:`, `tel:`, `sms:`, `facetime:`, `zoommtg://`, `zoomus://`, `msteams:`, `slack://`, `spotify:` and `x-apple.systempreferences:`.
 
 For a site not in the table, use its own search box with the session's browser tools, or open its front page and say what is left.
 

@@ -97,6 +97,13 @@ expect_rc "literal target" 0 add --replace weird url 'https://a.test/$(touch pwn
 expect_rc "launch literal target" 0 launch url 'https://a.test/$(touch pwned)?q=1;x'
 [ ! -e pwned ] && [ ! -e "$T/pwned" ] && ok || bad "target was not executed as code"
 expect_rc "launch bad kind" 2 launch exe foo
+# a saved or launched "app" or "with" must be an installed GUI app, never any command on PATH
+expect_rc "with: a plain command is refused" 4 add evil path "$T" rm
+expect_rc "app: a plain command is refused" 4 add evil2 app rm
+expect_rc "launch with: a plain command is refused" 4 launch path "$T" rm
+expect_rc "launch app: a plain command is refused" 4 launch app ls
+expect_rc "with: a path is refused" 4 add evil3 path "$T" /bin/rm
+[ ! -e "$BP_HOME/aliases.tsv" ] || ! grep -q '^evil' "$BP_HOME/aliases.tsv" && ok || bad "refused adds were not saved"
 expect_rc "launch refuses file: links" 2 launch url 'file:///etc/passwd'
 expect_rc "launch refuses javascript: links" 2 launch url 'javascript:alert(1)'
 expect_rc "launch refuses relative paths" 2 launch path relative/file.pdf
@@ -154,6 +161,8 @@ fi
 # --- link schemes
 expect_rc "mailto allowed" 0 add mail url 'mailto:a@b.test?subject=hi'
 expect_rc "zoom link allowed" 0 add standup url 'zoommtg://zoom.us/join?confno=123'
+expect_rc "app-internal links refused" 2 add n1 url 'obsidian://open?vault=x'
+expect_rc "editor deep links refused" 2 add n2 url 'vscode://file/etc/passwd'
 expect_rc "file: refused" 2 add f1 url 'file:///etc/passwd'
 expect_rc "javascript: refused" 2 add f2 url 'javascript:alert(1)'
 expect_rc "auto-save refuses non-web links" 6 add --auto z1 url 'zoommtg://zoom.us/join?confno=9'
