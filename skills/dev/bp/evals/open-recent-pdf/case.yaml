@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: open-recent-pdf
+expected_outcome: |
+  The newest PDF in Downloads (not the newest file of any type) is opened with the system default, nothing else is opened, and no shortcut is saved because the user did not name the file.

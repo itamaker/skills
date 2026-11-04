@@ -1,8 +1,8 @@
 {
   "name": "itamaker-skills",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "icon": "./.claude-plugin/icon.png",
-  "description": "Zhaoyang Jia's agent skills: agent delivery, tooling and evaluation, web page export, a cloud browser and design tools, and Go workspace management.",
+  "description": "Zhaoyang Jia's agent skills: agent delivery, tooling and evaluation, web page export, a cloud browser and design tools, Go workspace management, and local app shortcuts.",
   "author": {
     "name": "Zhaoyang Jia",
     "url": "https://github.com/itamaker"
@@ -30,6 +30,7 @@
     "./skills/web/stitch",
     "./skills/web/remote-browser",
     "./skills/dev/go-workspace-skill",
-    "./skills/dev/shipyard"
+    "./skills/dev/shipyard",
+    "./skills/dev/bp"
   ]
 }

@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: gmail-thread-link
+expected_outcome: |
+  The mail link is opened in Chrome exactly as given, and nothing that points at this single message is saved as a shortcut.

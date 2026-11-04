@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: save-chrome-and-gmail
+expected_outcome: |
+  Two shortcuts are saved (the Chrome app, and Gmail as a url opened in Chrome), nothing is launched, and the list of shortcuts is shown.

@@ -56,6 +56,7 @@ The same `npx skills` installer writes the skills into your repo as ordinary fil
 | stitch | Node.js (or Bun) and Stitch credentials: `STITCH_API_KEY`, or OAuth via `STITCH_ACCESS_TOKEN` plus `GOOGLE_CLOUD_PROJECT`. The SDK runner installs itself on first use |
 | go-workspace-skill | Python 3, Git and Go, plus a workspace config file (the skill can create one) |
 | shipyard | Python 3.11+ for its configuration and native setup helpers; Git and authenticated `gh` for merged-branch cleanup. Native roles are an optional, separate setup step. |
+| bp | macOS or Linux with bash; nothing to install. Drawing or typing live in an app, and driving web pages, need the session's computer-control or browser tools. |
 
 ## Reference
 
@@ -83,6 +84,7 @@ Work with web pages and web-based design tools.
 Everyday development workflow.
 
 - **[shipyard](./skills/dev/shipyard/SKILL.md)**: Coordinate Codex and Claude with scoped tests, model routing, CI acceptance, and safe branch cleanup.
+- **[bp](./skills/dev/bp/SKILL.md)**: Open apps, sites and files on macOS or Linux from saved nicknames, run tasks across apps, and learn new shortcuts as you work.
 - **[go-workspace-skill](./skills/dev/go-workspace-skill/SKILL.md)**: Sync, build and test a multi-repo Go workspace from one config file.
 
 ## In progress
