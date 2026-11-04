@@ -8,4 +8,4 @@ The plugin does not include these. Install one directly:
 npx skills@latest add itamaker/skills --skill=<name>
 ```
 
-- **[bp](./bp/SKILL.md)**: Open Mac apps, folders and URLs from short saved aliases, and add or remove them, with the bp CLI.
+- **[bp](./bp/SKILL.md)**: Open apps, folders and URLs on macOS or Linux from short saved nicknames, and add or remove them.
