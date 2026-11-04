@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: youtube-laogao
+expected_outcome: |
+  YouTube is opened on the channel-search results for 老高 without needing browser tools, only the plain YouTube address is saved, and the reply says which step is left because no browser tools exist.
