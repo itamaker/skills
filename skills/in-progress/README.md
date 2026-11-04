@@ -8,4 +8,4 @@ The plugin does not include these. Install one directly:
 npx skills@latest add itamaker/skills --skill=<name>
 ```
 
-- **[bp](./bp/SKILL.md)**: Open apps, folders and URLs on macOS or Linux from short saved nicknames, and add or remove them.
+- **[bp](./bp/SKILL.md)**: Do tasks across local apps on macOS or Linux and save each app and site as a nickname for next time.
