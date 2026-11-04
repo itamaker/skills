@@ -26,7 +26,7 @@ Example: "/bp open Chrome, go to Gmail, send Li the report, then tell Wang in Sl
 
 1. **Plan the apps.** List what the task needs to open: here Chrome, Gmail, Slack. Nothing is fixed; any app, site or folder the task names is handled the same way.
 2. **Open each one, resolving in this order.** (a) A saved alias. (b) A saved shortcut whose name or target contains the word, ignoring case. (c) An installed app on this machine (see **Find**). (d) For a site, its well-known address. If none fits, ask. Open it and note it as new unless it came from (a) or (b).
-3. **Do the work in the app** with whatever browser or computer-control tools this session offers. If it has none, stop after opening, say which steps are left for the user, and still save the shortcuts.
+3. **Do the work in the app.** Go straight to the right page with a deep link (see **Deep links**), then continue with whatever browser or computer-control tools this session offers. If it has none, stop after opening, say which steps are left for the user, and still save the shortcuts.
 4. **Save what was new** (see **Auto-save**) and finish with one line, for example: `Saved shortcuts: chrome, gmail, slack. /bp rm <name> removes one.`
 
 The task the user typed authorizes exactly the actions in it. If they gave no exact recipient or text for a message, show both and get a yes before sending. Send or post nothing the task did not ask for. At a login, 2FA or CAPTCHA, stop and hand over.
@@ -86,6 +86,28 @@ esac
 ```
 
 Report a non-zero exit and the printed reason instead of claiming success. On Linux a detached launch always exits 0, so check it started (`pgrep -x "$target"`) before saying it did. `xdg-open` needs a desktop session; over SSH or in a container it fails, and that is the answer to give. `pkill -x` matches the process name (first 15 characters) and exits 1 when nothing matched.
+
+## Deep links
+
+When a task names a site and something to look for or do there, open the page that already shows it instead of the front page plus clicks. This works even when the session has no browser tools. Build the URL, then open it with the **Run** `url` branch (set `kind=url`, `target`, and `with` to the browser the user named, or empty). Do not save it: it holds a query.
+
+| Goal | URL |
+|---|---|
+| Search YouTube | `https://www.youtube.com/results?search_query=<q>` |
+| Find a YouTube channel | the same URL plus `&sp=EgIQAg%253D%253D` |
+| Search Google | `https://www.google.com/search?q=<q>` |
+| Search GitHub | `https://github.com/search?q=<q>` |
+| Start a Gmail draft | `https://mail.google.com/mail/?view=cm&fs=1&to=<to>&su=<subject>&body=<body>` |
+
+Percent-encode every `<...>` value, including non-ASCII text:
+
+```bash
+urlenc() { local LC_ALL=C s="$1" i c; for ((i=0;i<${#s};i++)); do c=${s:i:1}; case $c in [a-zA-Z0-9.~_-]) printf '%s' "$c";; *) printf '%%%02X' "'$c";; esac; done; }
+```
+
+For a site not in the table, use its own search box with the session's browser tools, or open its front page and say what is left.
+
+**Going on into a result.** With browser tools, continue from the opened page: for a channel, take the top result whose name contains the words the user gave, open it (for "watch their videos", its `/videos` page), and tell the user the name and address reached and the next two matches, since names are often shared. Moving between pages is not consequential, so pick and say so rather than asking. Without browser tools, stop at the results page and say which click is left. A draft is only filled in; sending still needs the task to ask for it.
 
 ## Find
 
@@ -163,5 +185,6 @@ Clear everything only when the user asks for exactly that and confirms after see
 
 - The file handling, the Linux launch and quit paths and the Linux app scan (run against real and sample `.desktop` files) were checked on Linux with real `awk`, `pkill` and detached launches, and stand-ins for `open`, `osascript` and `xdg-open`. The macOS app scan was checked on a sample folder only, and the macOS commands follow standard `open` and `osascript` behavior but were not run on a Mac.
 - Linux launchers with a quoted or unusual `Exec` line may yield a command that `command -v` does not find; the desktop id with `gtk-launch` is the fallback, and it needs `gtk-launch` installed.
+- The YouTube channel-search link and the `urlenc` helper were checked from this Linux session (the link listed the expected channels in headless Chromium). The other deep links follow those sites' public URL formats and were not opened.
 - Driving Gmail or Slack depends on the browser or computer-control tools of the session. The skill does not ship its own automation, and the full flow has not been run end to end.
 - The file holds targets, not arbitrary shell commands, on purpose. For anything else, run the command directly and do not save it here.
