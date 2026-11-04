@@ -22,10 +22,10 @@ lock() {
   mkdir -p "$BP_HOME" 2>/dev/null
   l="$BP_HOME/.lock"; tries=0
   while ! mkdir "$l" 2>/dev/null; do
-    # a lock older than a minute belongs to a process that died
-    if [ -n "$(find "$l" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then rmdir "$l" 2>/dev/null; continue; fi
     tries=$((tries + 1))
-    [ "$tries" -le 100 ] || die 1 "the shortcut file is busy (delete $l if no bp command is running)"
+    # a lock older than a minute belongs to a process that died
+    if [ $((tries % 20)) = 0 ] && [ -n "$(find "$l" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then rmdir "$l" 2>/dev/null; continue; fi
+    [ "$tries" -le 300 ] || die 1 "the shortcut file is busy (delete $l if no bp command is running)"
     sleep 0.1
   done
   LOCKDIR="$l"
@@ -53,7 +53,7 @@ clean_value() { # non-empty, no tab or newline
 }
 
 valid_alias() {
-  case "$1" in '' | *[!a-z0-9_-]*) return 1 ;; esac
+  case "$1" in '' | *[!abcdefghijklmnopqrstuvwxyz0123456789_-]*) return 1 ;; esac
   for w in $RESERVED; do [ "$1" = "$w" ] && return 1; done
   return 0
 }
@@ -310,9 +310,11 @@ cmd_files() { # files <text> [folder]: find files by name, default under the hom
   [ $# -ge 1 ] || die 1 "usage: files <text> [folder]"
   text="$1"; root="${2:-$HOME}"
   [ -d "$root" ] || die 4 "folder does not exist: $root"
+  out=""
   if [ "$OS" = Darwin ] && command -v mdfind >/dev/null 2>&1; then
     out="$(mdfind -onlyin "$root" -name "$text" 2>/dev/null | head -n 20)"
-  else
+  fi
+  if [ -z "$out" ]; then
     pat="$(printf '%s' "$text" | sed -e 's/[][*?\\]/\\&/g')"
     out="$(find "$root" -maxdepth 5 \( -name '.*' -o -name node_modules -o -name Library \) -prune \
       -o -iname "*$pat*" -print 2>/dev/null | head -n 20)"
@@ -525,8 +527,8 @@ cmd_urlenc() {
   while [ "$i" -lt "${#s}" ]; do
     c="${s:$i:1}"
     case "$c" in
-      [a-zA-Z0-9.~_-]) out="$out$c" ;;
-      *) out="$out$(printf '%%%02X' "'$c")" ;;
+      [abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.~_-]) out="$out$c" ;;
+      *) v="$(printf '%d' "'$c")"; out="$out$(printf '%%%02X' $((v & 255)))" ;;
     esac
     i=$((i + 1))
   done

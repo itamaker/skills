@@ -11,7 +11,7 @@ LOG="$T/calls.log"
 TAB=$'\t'
 
 # Stand-ins: each records its name and arguments, one call per line.
-for c in open osascript xdg-open gtk-launch pkill google-chrome google-chrome-stable myeditor flatpak; do
+for c in open osascript xdg-open gtk-launch pkill pgrep google-chrome google-chrome-stable myeditor flatpak; do
   printf '#!/bin/sh\nprintf "%s" "%s" >>"%s"\nfor a in "$@"; do printf " [%%s]" "$a" >>"%s"; done\nprintf "\\n" >>"%s"\n' \
     '%s' "$c" "$LOG" "$LOG" "$LOG" >"$T/bin/$c"
   chmod +x "$T/bin/$c"
@@ -189,7 +189,7 @@ calls_n="$(grep -c . "$LOG")"; [ "$calls_n" = 3 ] && ok || bad "group made three
 # a failing member must not stop the rest, and the group must report failure
 if [ "$IS_MAC" = 1 ]; then OPENER=open; else OPENER=xdg-open; fi
 cp "$T/bin/$OPENER" "$T/bin/$OPENER.keep"
-printf '#!/bin/sh\necho "boom" >&2\nexit 1\n' >"$T/bin/$OPENER"; chmod +x "$T/bin/$OPENER"
+printf '#!/bin/sh\ncase "$*" in *plain.test*) echo boom >&2; exit 1 ;; esac\nexit 0\n' >"$T/bin/$OPENER"; chmod +x "$T/bin/$OPENER"
 expect_rc "ordinary url member to fail" 0 add plain-site url https://plain.test
 expect_rc "group with a failing member" 0 add mixed group plain-site,chrome
 : >"$LOG"
@@ -205,14 +205,14 @@ expect_out "note names the group" "morning"
 expect_rc "stop a group" 0 stop morning
 expect_rc "stop a url shortcut" 2 stop gmail
 expect_rc "stop unknown" 1 stop nope
-expect_rc "running: this shell's bash" 0 running bash
+# pgrep is a stand-in that logs its arguments and finds only names containing "alive"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"%s/pgrep.log"\ncase "$*" in *alive*) exit 0 ;; esac\nexit 1\n' "$T" >"$T/bin/pgrep"; chmod +x "$T/bin/pgrep"
+expect_rc "running: found" 0 running alive-app
 expect_rc "running: not running" 1 running no-such-process-xyz
+grep -q -- '-ix -- alive-app' "$T/pgrep.log" && ok || bad "running asks pgrep for an exact, case-insensitive name" "$(cat "$T/pgrep.log")"
 if [ "$IS_MAC" = 0 ]; then # Linux cuts process names to 15 characters
-  printf '#!/bin/sh\nsleep 5\n' >"$T/bin/averyveryverylongprocessname"; chmod +x "$T/bin/averyveryverylongprocessname"
-  ( "$T/bin/averyveryverylongprocessname" >/dev/null 2>&1 & )
-  sleep 0.5
-  expect_rc "running: a command name longer than 15 characters" 0 running averyveryverylongprocessname
-  command -p pkill -f averyveryverylongprocessname 2>/dev/null
+  expect_rc "running: a long alive name" 0 running alive-averyveryverylongname
+  grep -q -- '-ix -- alive-averyvery$' "$T/pgrep.log" && ok || bad "running cuts a long name to 15 characters" "$(tail -1 "$T/pgrep.log")"
 fi
 
 # --- recent and files
@@ -272,9 +272,10 @@ BP_OUT="$T/out" bash "$BP" outfile a.svg | grep -qx "$T/out/a.svg" && ok || bad 
 
 # --- review fixes: locking, wrappers, quit targets, reserved words
 rm -f "$BP_HOME/aliases.tsv"
-for i in 1 2 3 4 5 6 7 8; do bash "$BP" add "par$i" url "https://par$i.test" >/dev/null 2>&1 & done
+mkdir -p "$T/par"
+for i in 1 2 3 4 5 6 7 8; do bash "$BP" add "par$i" url "https://par$i.test" >"$T/par/$i.out" 2>&1 & done
 wait
-[ "$(store_lines)" = 8 ] && ok || bad "eight parallel adds all landed" "lines: $(store_lines)"
+[ "$(store_lines)" = 8 ] && ok || bad "eight parallel adds all landed" "lines: $(store_lines); outputs: $(cat "$T"/par/*.out | tr '\n' '|'); store: $(tr '\t\n' ' |' <"$BP_HOME/aliases.tsv")"
 [ ! -e "$BP_HOME/.lock" ] && ok || bad "the lock is released"
 expect_rc "clear removes everything" 0 clear --yes
 [ "$(store_lines)" = 0 ] && ok || bad "clear emptied the store"
