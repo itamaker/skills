@@ -17,25 +17,27 @@ RESERVED="add rm ls find scan auto stop"
 die() { code=$1; shift; printf 'bp: %s\n' "$*" >&2; exit "$code"; }
 
 # One writer at a time: parallel bp.sh calls must not overwrite each other's changes.
-LOCKDIR=""
+LOCKFILE=""
 trace() { [ -z "${BP_TRACE:-}" ] || printf '%s %s %s\n' "$(date +%s.%N)" "$$" "$*" >>"$BP_TRACE"; }
 unlock() {
-  [ -n "$LOCKDIR" ] || return 0
+  [ -n "$LOCKFILE" ] || return 0
   trace "unlock"
-  rmdir "$LOCKDIR" 2>/dev/null
-  LOCKDIR=""
+  rm -f "$LOCKFILE"
+  LOCKFILE=""
 }
 lock() {
   mkdir -p "$BP_HOME" 2>/dev/null
   l="$BP_HOME/.lock"; tries=0
-  while ! mkdir "$l" 2>/dev/null; do
+  # The shell's own exclusive create (noclobber is O_EXCL): it fails when the file exists, and no
+  # external tool is involved. A plain mkdir was seen succeeding for two processes at once on CI.
+  while ! ( set -C; printf '%s\n' "$$" >"$l" ) 2>/dev/null; do
     tries=$((tries + 1))
     # a lock older than a minute belongs to a process that died
-    if [ $((tries % 20)) = 0 ] && [ -n "$(find "$l" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then trace "stale-removal"; rmdir "$l" 2>/dev/null; continue; fi
+    if [ $((tries % 20)) = 0 ] && [ -n "$(find "$l" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then trace "stale-removal"; rm -f "$l"; continue; fi
     [ "$tries" -le 300 ] || die 1 "the shortcut file is busy (delete $l if no bp command is running)"
     sleep 0.1
   done
-  LOCKDIR="$l"
+  LOCKFILE="$l"
   trace "lock after $tries waits"
   trap unlock EXIT
 }

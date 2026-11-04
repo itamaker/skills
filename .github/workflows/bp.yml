@@ -26,6 +26,11 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
+      - name: Show the shell and tool versions
+        run: |
+          /bin/bash --version | head -1
+          mkdir --version 2>&1 | head -1 || true
+          uname -sr
       - name: Run the bp script tests with the system bash
         # /bin/bash is bash 3.2 on macOS, the oldest shell the script must support.
         run: PATH="/bin:/usr/bin:$PATH" /bin/bash skills/dev/bp/scripts/test.sh
