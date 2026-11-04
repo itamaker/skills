@@ -1,0 +1,4 @@
+interface:
+  display_name: "bp"
+  short_description: "Open Mac apps, folders and URLs from short saved aliases"
+  default_prompt: "Use $bp to open one of my saved shortcuts, or to save a new one."

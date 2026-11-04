@@ -1,0 +1,33 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Web",
+      "description": "Web pages and web-based design tools.",
+      "skills": [
+        "remote-browser",
+        "webpage-to-pdf",
+        "stitch"
+      ]
+    },
+    {
+      "title": "Agent Tooling",
+      "description": "Build and evaluate LLM agents.",
+      "skills": [
+        "runlens",
+        "ragcheck",
+        "promptdeck",
+        "datasetlint"
+      ]
+    },
+    {
+      "title": "Dev",
+      "description": "Everyday development workflow.",
+      "skills": [
+        "shipyard",
+        "go-workspace-skill"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "itamaker",
+  "owner": {
+    "name": "Zhaoyang Jia",
+    "url": "https://github.com/itamaker"
+  },
+  "description": "Zhaoyang Jia's agent skills, as an installable Claude Code plugin.",
+  "plugins": [
+    {
+      "name": "itamaker-skills",
+      "source": "./",
+      "description": "Agent delivery, tooling and evaluation, web page export, a cloud browser and design tools, and Go workspace management.",
+      "category": "development",
+      "keywords": [
+        "agent-skills",
+        "llm",
+        "evaluation",
+        "pdf",
+        "go"
+      ]
+    }
+  ]
+}
