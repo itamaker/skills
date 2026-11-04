@@ -173,7 +173,7 @@ expect_rc "list shows group" 0 list
 expect_out "group members shown" "chrome,gmail,work-dir"
 : >"$LOG"
 expect_rc "run group" 0 run morning
-expect_out "group reports each member" "opened work-dir"
+expect_out "group reports each member" "asked to open work-dir"
 sleep 0.5
 calls_n="$(grep -c . "$LOG")"; [ "$calls_n" = 3 ] && ok || bad "group made three launches" "calls: $calls_n: $(cat "$LOG")"
 # a failing member must not stop the rest, and the group must report failure
@@ -185,7 +185,7 @@ expect_rc "group with a failing member" 0 add mixed group plain-site,chrome
 : >"$LOG"
 expect_rc "run mixed group reports failure" 5 run mixed
 expect_out "failure named" "FAILED plain-site"
-expect_out "later member still opened" "opened chrome"
+expect_out "later member still opened" "asked to open chrome"
 mv "$T/bin/$OPENER.keep" "$T/bin/$OPENER"
 expect_rc "rm group member notes the group" 0 rm chrome
 expect_out "note names the group" "morning"
@@ -197,6 +197,13 @@ expect_rc "stop a url shortcut" 2 stop gmail
 expect_rc "stop unknown" 1 stop nope
 expect_rc "running: this shell's bash" 0 running bash
 expect_rc "running: not running" 1 running no-such-process-xyz
+if [ "$IS_MAC" = 0 ]; then # Linux cuts process names to 15 characters
+  printf '#!/bin/sh\nsleep 5\n' >"$T/bin/averyveryverylongprocessname"; chmod +x "$T/bin/averyveryverylongprocessname"
+  ( "$T/bin/averyveryverylongprocessname" >/dev/null 2>&1 & )
+  sleep 0.5
+  expect_rc "running: a command name longer than 15 characters" 0 running averyveryverylongprocessname
+  command -p pkill -f averyveryverylongprocessname 2>/dev/null
+fi
 
 # --- recent and files
 mkdir -p "$T/dl" "$T/home/Projects/sub"
@@ -223,6 +230,35 @@ expect_rc "files: no match" 1 files zzz-nothing
 expect_rc "files: glob characters are literal" 1 files '[x]*'
 expect_rc "files: in a folder" 0 files notes "$T/home/Projects"
 expect_rc "files: missing folder" 4 files notes "$T/does-not-exist"
+
+# --- category and outfile
+mkdir -p "$T/apps/Krita.app"
+printf '[Desktop Entry]\nType=Application\nName=Krita\nExec=krita %%F\n' >"$T/apps/krita.desktop"
+printf '[Desktop Entry]\nType=Application\nName=Inkscape\nExec=inkscape %%F\n' >"$T/apps/inkscape.desktop"
+expect_rc "category list" 0 category
+expect_out "category list names drawing" "drawing"
+expect_rc "category drawing" 0 category drawing
+expect_out "drawing finds Krita" "Krita"
+if [ "$IS_MAC" = 0 ]; then expect_out "drawing finds Inkscape" "Inkscape"; fi
+expect_rc "category browser finds Chrome" 0 category browser
+expect_out "browser has Chrome" "Chrome"
+expect_rc "category with no match" 1 category music
+expect_rc "unknown category" 1 category nonsense
+export BP_OUT=""; unset BP_OUT
+expect_rc "outfile picture" 0 outfile cat.svg
+[ "$OUT" = "$T/home/Pictures/bp/cat.svg" ] && ok || bad "picture goes to Pictures/bp" "$OUT"
+[ -d "$T/home/Pictures/bp" ] && ok || bad "outfile creates the folder"
+printf x >"$T/home/Pictures/bp/cat.svg"
+expect_rc "outfile does not overwrite" 0 outfile cat.svg
+[ "$OUT" = "$T/home/Pictures/bp/cat-2.svg" ] && ok || bad "second file gets -2" "$OUT"
+expect_rc "outfile document" 0 outfile notes.md
+[ "$OUT" = "$T/home/Documents/bp/notes.md" ] && ok || bad "document goes to Documents/bp" "$OUT"
+expect_rc "outfile without extension" 0 outfile README
+[ "$OUT" = "$T/home/Documents/bp/README" ] && ok || bad "no extension" "$OUT"
+expect_rc "outfile refuses folders" 2 outfile ../x.svg
+expect_rc "outfile refuses dotfiles" 2 outfile .bashrc
+expect_rc "outfile needs a name" 1 outfile
+BP_OUT="$T/out" bash "$BP" outfile a.svg | grep -qx "$T/out/a.svg" && ok || bad "BP_OUT overrides the folder"
 
 # --- helpers
 expect_rc "alias: Google Chrome" 0 alias "Google Chrome"; [ "$OUT" = chrome ] && ok || bad "alias for Google Chrome" "$OUT"

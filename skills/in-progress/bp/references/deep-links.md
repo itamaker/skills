@@ -19,6 +19,7 @@ Build the URL, then open it without saving (it holds a query): `$BP launch url "
 | Start a Gmail draft | `https://mail.google.com/mail/?view=cm&fs=1&to=<to>&su=<subject>&body=<body>` |
 | New calendar event | `https://calendar.google.com/calendar/render?action=TEMPLATE&text=<title>&dates=<start>/<end>&details=<notes>` with times as `YYYYMMDDTHHMMSS` (local) |
 | New Google Doc / Sheet | `https://docs.google.com/document/create` / `https://docs.google.com/spreadsheets/create` |
+| Blank whiteboard | `https://excalidraw.com` or `https://www.tldraw.com` (opens an empty board; drawing on it needs the session's browser or computer-control tools) |
 | Mail app draft | `mailto:<to>?subject=<s>&body=<b>` (opens the system mail app, not a browser) |
 | Spotify search | `spotify:search:<q>` (opens the Spotify app) |
 

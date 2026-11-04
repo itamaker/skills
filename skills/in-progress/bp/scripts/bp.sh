@@ -190,7 +190,7 @@ $line
 EOF
   if [ "$kind" = group ]; then run_group "$target"; return; fi
   launch "$kind" "$target" "${with:-}"
-  echo "opened $1 ($kind $target${with:+ in $with})"
+  echo "asked to open $1 ($kind $target${with:+ in $with})"
 }
 
 run_group() { # members: open each in order, report failures, keep going
@@ -203,7 +203,7 @@ run_group() { # members: open each in order, report failures, keep going
 $ml
 EOF
       if ( launch "$k" "$t" "${w:-}" ) 2>"$err"; then
-        echo "opened $m ($k $t${w:+ in $w})"
+        echo "asked to open $m ($k $t${w:+ in $w})"
       else
         failed=$((failed + 1)); echo "FAILED $m: $(cat "$err" 2>/dev/null)"
       fi
@@ -242,7 +242,9 @@ EOF
 
 cmd_running() {
   [ $# -ge 1 ] || die 1 "usage: running <process name>"
-  if pgrep -ix -- "$*" >/dev/null 2>&1; then echo "running: $*"; else echo "not running: $*"; return 1; fi
+  name="$*"
+  [ "$OS" = Darwin ] || name="${name:0:15}" # Linux process names are cut to 15 characters
+  if pgrep -ix -- "$name" >/dev/null 2>&1; then echo "running: $*"; else echo "not running: $*"; return 1; fi
 }
 
 cmd_recent() { # newest files in Downloads, Desktop and Documents
@@ -292,7 +294,7 @@ cmd_launch() { # open without saving: launch <kind> <target> [with]
     path) case "$2" in /*) ;; *) die 2 "a path must be absolute (expand ~ first)" ;; esac ;;
   esac
   launch "$1" "$2" "${3:-}"
-  echo "opened $1 $2${3:+ in $3}"
+  echo "asked to open $1 $2${3:+ in $3}"
 }
 
 url_ok_for_auto() { # stable entry points only: no query, fragment or credentials
@@ -398,6 +400,57 @@ cmd_find() {
   printf '%s\n' "$out"
 }
 
+category_pattern() { # extended-regex of name fragments for a kind of app
+  case "$1" in
+    drawing) echo 'paint|draw|sketch|krita|gimp|inkscape|pixelmator|affinity|freeform|whiteboard|procreate|illustrator|photoshop|figma|canva|excalidraw' ;;
+    browser) echo 'chrome|chromium|firefox|safari|edge|brave|opera|vivaldi|arc' ;;
+    editor) echo 'code|vim|emacs|sublime|textedit|text editor|gedit|kate|zed|cursor|xcode|intellij|pycharm|webstorm|notepad' ;;
+    terminal) echo 'terminal|iterm|konsole|alacritty|kitty|wezterm|tilix|xterm|ghostty' ;;
+    mail) echo 'mail|thunderbird|outlook|evolution|geary|spark' ;;
+    chat) echo 'slack|discord|telegram|wechat|weixin|teams|zoom|signal|element|messages|whatsapp|line|feishu|lark|dingtalk|qq' ;;
+    music) echo 'music|spotify|rhythmbox|clementine|netease|qqmusic|amarok' ;;
+    video) echo 'vlc|mpv|quicktime|iina|totem|celluloid|bilibili' ;;
+    notes) echo 'notes|obsidian|notion|joplin|bear|typora|evernote|logseq' ;;
+    office) echo 'word|excel|powerpoint|pages|numbers|keynote|libreoffice|wps|onlyoffice' ;;
+    spreadsheet) echo 'excel|numbers|calc|wps' ;;
+    files) echo 'finder|files|nautilus|dolphin|thunar|nemo|pcmanfm' ;;
+    settings) echo 'settings|preferences|control center' ;;
+    *) return 1 ;;
+  esac
+}
+
+CATEGORIES="drawing browser editor terminal mail chat music video notes office spreadsheet files settings"
+
+cmd_category() { # installed apps of one kind, for requests like "open a drawing app"
+  if [ $# -eq 0 ]; then echo "categories: $CATEGORIES"; return 0; fi
+  pat="$(category_pattern "$1")" || die 1 "unknown category '$1' (categories: $CATEGORIES)"
+  out="$(apps_list | grep -iE -- "$pat")" || { echo "no installed app in category '$1'"; return 1; }
+  printf '%s\n' "$out"
+}
+
+cmd_outfile() { # a free absolute path for a file you are about to create for the user
+  [ $# -eq 1 ] || die 1 "usage: outfile <filename.ext>"
+  name="$1"
+  case "$name" in
+    */* | .* | '') die 2 "give a plain file name, no folders and no leading dot" ;;
+  esac
+  clean_value "$name" || die 2 "invalid file name"
+  ext="$(printf '%s' "${name##*.}" | LC_ALL=C tr 'A-Z' 'a-z')"
+  [ "$ext" != "$name" ] || ext=""
+  case "$ext" in
+    svg | png | jpg | jpeg | gif | webp | bmp) dir="${BP_OUT:-$HOME/Pictures/bp}" ;;
+    *) dir="${BP_OUT:-$HOME/Documents/bp}" ;;
+  esac
+  mkdir -p "$dir" || die 2 "cannot create $dir"
+  base="${name%.*}"; [ -n "$ext" ] || base="$name"
+  cand="$dir/$name"; n=2
+  while [ -e "$cand" ]; do
+    if [ -n "$ext" ]; then cand="$dir/$base-$n.${name##*.}"; else cand="$dir/$base-$n"; fi
+    n=$((n + 1))
+  done
+  printf '%s\n' "$cand"
+}
+
 cmd_scan() {
   S="$([ -f "$STORE" ] && cut -f3 "$STORE")"
   apps_list | S="$S" awk -F'\t' '
@@ -458,6 +511,8 @@ bp.sh <command>
   clear --yes                   remove all shortcuts
   find <text>                   installed apps matching text (name<TAB>target)
   scan                          installed apps not yet saved (name<TAB>target)
+  category [name]               installed apps of one kind (drawing, browser, editor, ...)
+  outfile <filename.ext>        a free path under ~/Pictures/bp or ~/Documents/bp for a file you create
   alias <app name>              suggest an alias
   urlenc <text>                 percent-encode text for a URL
   auto [on|off|status]          switch auto-saving
@@ -482,6 +537,8 @@ main() {
     clear) cmd_clear "$@" ;;
     find) cmd_find "$@" ;;
     scan) cmd_scan "$@" ;;
+    category) cmd_category "$@" ;;
+    outfile) cmd_outfile "$@" ;;
     alias) cmd_alias "$@" ;;
     urlenc) cmd_urlenc "$@" ;;
     auto) cmd_auto "$@" ;;
