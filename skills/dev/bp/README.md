@@ -2,6 +2,10 @@
 
 A skill that does everyday computer tasks across your local apps and remembers what it had to open. The first time you say "open Chrome, go to Gmail", it finds the app and the page and saves them. After that `/bp gmail`, `/bp chrome` or `/bp work` just opens them. Nothing is preconfigured: any app, site, file or folder you name is resolved on the spot. macOS and Linux; Windows is not supported.
 
+![bp turns one sentence into a saved nickname: open Chrome, Gmail and Slack, then `/bp work` next day](./assets/bp-demo.gif)
+
+An illustrative terminal mock-up, not a recording. [Watch it as MP4](./assets/bp-demo.mp4).
+
 ## What Claude can do with it
 
 - **Open things by nickname**: apps, sites, files and folders, from a saved shortcut or straight from a plain request.
@@ -54,6 +58,7 @@ Removing one shortcut asks first. Clearing all of them only happens when you ask
 <skills dir>/bp/                      the skill (wherever your install puts it)
 ├── SKILL.md                          instructions Claude follows
 ├── README.md                         this file
+├── assets/                           the demo video shown above
 ├── scripts/
 │   ├── bp.sh                         the one script that keeps shortcuts and opens things
 │   └── test.sh                       tests against stand-in launch tools

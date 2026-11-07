@@ -2,6 +2,10 @@
 
 A skill for running agent-delivered work with Claude Code and Codex without losing track of it. The main conversation owns your goal, priorities and final acceptance. It handles small tasks itself and brings in workers, a project manager or advisors only when their independent work saves more time than the handoff costs. Shipyard also fixes which model and effort each stage uses, how checks and reviews are accepted, and how a merged branch gets cleaned up.
 
+![shipyard: set models per stage, run parallel tickets through review, CI and merge, then clean up merged branches](./assets/shipyard-demo.gif)
+
+An illustrative mock-up, not a recording. [Watch it as MP4](./assets/shipyard-demo.mp4).
+
 ## What it covers
 
 - **Delegation with clear ownership.** Every task gets one coordinator and a bounded brief: objective, owned files, interfaces, dependencies, acceptance and the checks to run. Parallel tickets in one repository need separate worktrees.
@@ -89,6 +93,7 @@ Omit `--apply` for a read-only preview. It needs Python 3, Git and an authentica
 ├── scripts/                          parameter parser, settings, client installer, cleanup helper
 └── assets/
     ├── model-policy.json             the central model and effort policy
+    ├── shipyard-demo.gif / .mp4      the demo shown above
     ├── claude/                       Claude Code role templates and launcher settings
     └── codex/                        Codex role templates and launcher config
 ```
