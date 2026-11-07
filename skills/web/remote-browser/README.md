@@ -16,6 +16,10 @@ A Claude Code skill that gives Claude a real cloud browser of its own. It deploy
 
 You can also open the Worker's address in a browser for a small web UI: paste the token once, then fetch pages or open a remote browser by hand.
 
+Fetch returns a page's title, text and links:
+
+![The web UI after fetching example.com](./assets/web-ui-fetch.png)
+
 Here a remote browser is open on `ipwho.is`, which reports a Cloudflare address:
 
 ![The web UI with a remote browser open on ipwho.is](./assets/web-ui-live-view.png)
