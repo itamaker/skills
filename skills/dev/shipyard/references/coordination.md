@@ -12,6 +12,8 @@ Before dispatch, resolve model and effort using [models.md](models.md), passing 
 
 ## Dispatch and milestones
 
+When proposing to replace a subordinate in ask mode, follow the [60-second replacement window](replacement-window.md). Notify the user, keep independent work moving and resolve the decision before handing off the affected ticket.
+
 Parallel ticket branches in one repository need separate worktrees/checkouts. Otherwise serialize their checkout, edits, tests, commits, and pushes. Specify ownership before dispatch; coordinate shared interfaces before dependent edits. Workers implement one active milestone at a time and do not dispatch PMs or implementation workers.
 
 Choose independently reviewable behavior slices, usually 30–90 minutes of active work. Each has acceptance, dependencies, a reviewer, and a checkpoint. When remote delivery is authorized, publish a Draft PR at the first meaningful verified slice after applicable reviews; update the same PR at later verified checkpoints. After 60 minutes without a publishable checkpoint, return diff, checks, blocker, and next slice; do not make empty commits to satisfy a timer.

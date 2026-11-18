@@ -47,6 +47,14 @@ def parser():
     result.add_argument('--config', action=Once, nargs=0, default=False, help='Show all nine stage settings without changing them')
     result.add_argument('--reset', action=Once, metavar='TARGET[,TARGET]|all', help='Remove selected stage overrides and reveal inherited values')
     result.add_argument('--preview', action=Once, nargs=0, default=False, help='Validate without saving or recording an override')
+    personas = result.add_mutually_exclusive_group()
+    personas.add_argument('--personas', action=Once, nargs=0, default=False, help='List personal profiles and active role selections')
+    personas.add_argument('--persona-show', action=Once, metavar='ROLE', help='Read the selected profile for a role')
+    personas.add_argument('--persona', action=Once, metavar='ROLE:ID', help='Save a personal role profile selection shared by both clients')
+    personas.add_argument('--persona-create', action=Once, metavar='ID', help='Create a personal Markdown profile')
+    personas.add_argument('--persona-reset', action=Once, metavar='ROLE', help='Restore a role default profile')
+    result.add_argument('--name', action=Once, help='Display name for a new profile')
+    result.add_argument('--traits', action=Once, help='Behavioral traits for a new profile')
     result.add_argument('--client', choices=('codex', 'claude'), action=Once, help=argparse.SUPPRESS)
     result.add_argument('--project', type=Path, action=Once, help=argparse.SUPPRESS)
     result.add_argument('--user-config', type=Path, action=Once, help=argparse.SUPPRESS)
@@ -141,6 +149,12 @@ def handle(argv, *, backend=None, cwd=None, input_text=None):
     if '--help' in argv:
         return {'mode': 'help', 'text': command.format_help()}
     args = command.parse_args(argv)
+    if any((args.personas, args.persona_show, args.persona, args.persona_create,
+            args.persona_reset, args.name is not None, args.traits is not None)):
+        spec = importlib.util.spec_from_file_location('shipyard_personas', Path(__file__).with_name('persona_settings.py'))
+        personas = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(personas)
+        return personas.handle(args)
     operations, names = [], []
     for target, (stage, role) in TARGETS.items():
         value = getattr(args, target.replace('-', '_'))

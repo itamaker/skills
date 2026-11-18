@@ -11,8 +11,10 @@ If the text after the skill name (`/shipyard`, `/itamaker-skills:shipyard` in th
 
 ## Load only your path
 
+- **Role personality:** for normal delivery, load the current role's working style once at entry using [personas.md](references/personas.md). The primary conversation uses `chief-of-staff`. Resolve the assigned role again when starting a new invocation. Persona commands use the flat-parameter path above.
 - **Configure models:** for `/shipyard` or `$shipyard` requests to change/show/reset model settings, read [configuration.md](references/configuration.md) first. Map intent to task, one-shot, project, or personal scope; persist only an explicit save request.
 - **Coordinator / PM:** read [coordination.md](references/coordination.md) for dispatch, exclusive ownership, milestones, and recovery. Read [verification.md](references/verification.md) when defining checks or accepting a revision.
+- **Ask-mode replacement:** when the Chief of Staff proposes a staffing change in ask mode, use the [timed notice and handoff procedure](references/replacement-window.md).
 - **Model / effort selection:** before starting a subagent, follow [models.md](references/models.md). Select by task and risk from the central policy, honor explicit overrides, and check the actual host's override support.
 - **Implementation worker:** read [implementation.md](references/implementation.md). Run only tests and checks related to the ticket's behavior and affected dependencies; full-suite execution belongs to the coordinator's CI/integration stage.
 - **Advisor:** answer the bounded question using current evidence. Remain read-only, return actionable findings, and finish without spawning helpers. Read [verification.md](references/verification.md) only when test/acceptance policy is the question.

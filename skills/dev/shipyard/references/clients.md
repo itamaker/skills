@@ -14,6 +14,8 @@ Publication and installation are managed by the skills repository. Native role s
 
 ## Optional native role setup
 
+To add personality loading to previously installed native roles, update the skill, preview and apply the native setup below, then start a new session. Subsequent personality switches read the selected Markdown at runtime and require no reinstall.
+
 The skill is self-contained: `assets/codex` and `assets/claude` own the native role templates and optional launch configuration; `assets/model-policy.json` centralizes model/effort choices. The old `dot_codex` and `dot_claude` source directories are retired from dotfiles. Do not load all assets into context during ordinary work.
 
 After globally installing the skill, preview then explicitly apply its native configuration:

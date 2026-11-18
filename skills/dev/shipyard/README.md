@@ -28,10 +28,26 @@ Install the skill (see below), then ask in plain words, or use flat parameters:
 Codex uses `$shipyard` with its own model IDs:
 
 ```text
-$shipyard --implement gpt-6.1-sol:medium --verify gpt-6.1-sol:high
+$shipyard --implement gpt-6.2-sol:medium --verify gpt-6.2-sol:high
 ```
 
 Plain requests also work: "use deep for this task", "next worker: model=sonnet, effort=high", "save economy for this project's workers", "show active settings".
+
+## Role personalities
+
+In ask mode, the Chief of Staff gives the user 60 seconds to respond to a proposed role replacement. Silence allows that specific handoff. Any reply interrupts the default. See the [replacement window](references/replacement-window.md) for timing and recovery.
+
+Each role has an editable [Markdown profile](references/personas/). The Chief of Staff starts with Elon Musk's emphasis on milestones that enable each other. Switch to Andy Grove's focus on team output, or create a profile with your own name and traits:
+
+```text
+/shipyard --persona chief-of-staff:andy-grove
+/shipyard --persona-create morgan --name "Morgan" --traits "Hear each owner, then name the decision blocking delivery."
+/shipyard --persona chief-of-staff:morgan
+/shipyard --persona-show chief-of-staff
+/shipyard --persona-reset chief-of-staff
+```
+
+Use `--personas` to see available IDs and role selections. Codex accepts the same arguments after `$shipyard`. Selections are personal and shared across projects and both clients. The [profile guide](references/personas.md) explains file locations and when a switch takes effect.
 
 ## Stages and parameters
 

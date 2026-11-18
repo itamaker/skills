@@ -29,12 +29,12 @@ class ModelPolicyTests(unittest.TestCase):
         self.assertEqual(self.select()['tier'], 'balanced')
         self.assertEqual(self.select(role='project-manager', complexity='low')['tier'], 'balanced')
         self.assertEqual(self.select(role='architecture-advisor', complexity='low')['tier'], 'deep')
-        self.assertEqual(self.select(complexity='high')['tier'], 'deep')
+        self.assertEqual(self.select(complexity='high')['requested_model'], 'gpt-6.2-astra')
         self.assertEqual(self.select(risk='high')['tier'], 'deep')
         self.assertEqual(self.select(risk='medium', complexity='low')['tier'], 'balanced')
 
     def test_defaults_for_both_clients(self):
-        for client, model in [('codex', 'gpt-6.1-sol'), ('claude', 'sonnet')]:
+        for client, model in [('codex', 'gpt-6.2-sol'), ('claude', 'sonnet')]:
             with self.subTest(client=client):
                 result = self.select(client)
                 self.assertEqual((result['requested_model'], result['requested_effort']), (model, 'medium'))
@@ -183,13 +183,13 @@ class ModelPolicyTests(unittest.TestCase):
             self.assertEqual(dict(selector.os.environ), before)
 
     def test_visual_auto_finds_capable_tier_without_lowering_minimum(self):
-        self.policy['clients']['codex']['model_capabilities']['gpt-6.1-sol']['vision'] = False
+        self.policy['clients']['codex']['model_capabilities']['gpt-6.2-sol']['vision'] = False
         result = self.select(role='visual-advisor')
         self.assertEqual(result['tier'], 'deep')
         with self.assertRaisesRegex(selector.PolicyError, 'vision-capable'):
             self.select(role='visual-advisor', max_tier='balanced')
         with self.assertRaisesRegex(selector.PolicyError, 'vision capability'):
-            self.select(role='visual-advisor', model='gpt-6.1-sol')
+            self.select(role='visual-advisor', model='gpt-6.2-sol')
 
     def test_invalid_entire_policy_is_rejected_even_for_other_client(self):
         corruptions = [lambda p: p.update(version=True),
