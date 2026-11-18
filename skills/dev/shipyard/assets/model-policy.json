@@ -32,11 +32,11 @@
           "effort": "low"
         },
         "balanced": {
-          "model": "gpt-6.1-sol",
+          "model": "gpt-6.2-sol",
           "effort": "medium"
         },
         "deep": {
-          "model": "gpt-6-astra",
+          "model": "gpt-6.2-astra",
           "effort": "high"
         }
       },
@@ -74,6 +74,32 @@
             "high",
             "xhigh",
             "max"
+          ],
+          "vision": true
+        },
+        "gpt-6.2-sol": {
+          "tier": "balanced",
+          "default_effort": "medium",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "vision": true
+        },
+        "gpt-6.2-astra": {
+          "tier": "deep",
+          "default_effort": "high",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
           ],
           "vision": true
         }

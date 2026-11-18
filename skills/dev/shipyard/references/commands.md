@@ -10,7 +10,7 @@ Use the same parameters after Claude Code's `/shipyard` or Codex's `$shipyard`. 
 Codex uses its configured model IDs:
 
 ```text
-$shipyard --implement gpt-6.1-sol:medium --verify gpt-6.1-sol:high
+$shipyard --implement gpt-6.2-sol:medium --verify gpt-6.2-sol:high
 ```
 
 Every value is `MODEL:EFFORT` or `auto`. The parser splits on the final colon so registered provider IDs containing colons are preserved. Models and efforts must be declared in the selected policy. `auto` masks inherited model/effort pins for that stage; it is not a literal model name.
@@ -54,6 +54,8 @@ Optional controls are separate from everyday assignments:
 `--user`, `--task`, and `--next` are mutually exclusive. A next-agent assignment accepts one target; a task assignment can configure several targets. Task/next results are coordinator-owned intents, not a hidden session-state service. `--config` or `--reset` with these controls reads/clears the coordinator's matching pending entries and never consumes or persists them. See [configuration.md](configuration.md) for lifetime and normalization rules.
 
 ## Safe host bridge
+
+For personality commands, use the same JSON bridge with one of `--personas`, `--persona-show ROLE`, `--persona ROLE:ID`, `--persona-create ID --name NAME --traits TEXT`, or `--persona-reset ROLE`. They operate on personal profiles shared by both clients. See [role personalities](personas.md) for examples and application of the result.
 
 The skill host supplies the active client and established authorized project. It must not interpolate raw skill arguments into a shell command or a dynamic skill `!` expression.
 
