@@ -152,6 +152,54 @@
           "vision": true
         }
       }
+    },
+    "muse": {
+      "tiers": {
+        "economy": {
+          "model": "muse-economy",
+          "effort": "low"
+        },
+        "balanced": {
+          "model": "muse-balanced",
+          "effort": "medium"
+        },
+        "deep": {
+          "model": "muse-deep",
+          "effort": "high"
+        }
+      },
+      "model_capabilities": {
+        "muse-economy": {
+          "tier": "economy",
+          "default_effort": "low",
+          "efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "vision": true
+        },
+        "muse-balanced": {
+          "tier": "balanced",
+          "default_effort": "medium",
+          "efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "vision": true
+        },
+        "muse-deep": {
+          "tier": "deep",
+          "default_effort": "high",
+          "efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "vision": true
+        }
+      }
     }
   }
 }

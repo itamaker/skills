@@ -51,7 +51,7 @@ def validate_policy(policy):
         require(isinstance(values, dict) and set(values) == set(expected), f'Policy auto.{key} has invalid keys')
         require(all(tier in TIERS for tier in values.values()), f'Policy auto.{key} has invalid tiers')
     clients = policy.get('clients')
-    require(isinstance(clients, dict) and set(clients) == {'codex', 'claude'}, 'Policy requires codex and claude clients')
+    require(isinstance(clients, dict) and (set(clients) == {'codex', 'claude'} or set(clients) == {'codex', 'claude', 'muse'}), 'Policy requires codex and claude clients')
     for client, settings in clients.items():
         require(isinstance(settings, dict), f'Invalid settings for {client}')
         tiers, capabilities = settings.get('tiers'), settings.get('model_capabilities')
@@ -105,12 +105,25 @@ def claude_constraints(runtime, version, model, env, warnings):
     return constraints
 
 
+def muse_constraints():
+    """Record Muse's requested model/effort without ever applying one.
+
+    Muse's subagent spawn accepts no model/effort parameters, so a plan
+    may record what was requested while the effective selection stays
+    unknown. Nothing in this output claims a model changed.
+    """
+    return [
+        'Muse subagent spawn accepts no model/effort parameters; the requested model and effort are recorded only and never applied',
+        'Effective model and effort remain unknown; this plan does not change the model used by any Muse subagent',
+    ]
+
+
 def select(policy, client, role='implementation-worker', complexity='medium', risk='low',
            tier='auto', model=None, effort=None, max_tier='deep', escalate=False,
            escalation_count=0, evidence=None, runtime='unknown', claude_version=None, env=None):
     """runtime=spawn asserts the caller verified model+effort override fields in its host schema."""
     validate_policy(policy)
-    require(client in ('codex', 'claude'), 'Unknown client')
+    require(client in ('codex', 'claude', 'muse'), 'Unknown client')
     require(isinstance(role, str), 'Role must be a string')
     role = role.replace('_', '-')
     require(role in ROLES, 'Unknown role')
@@ -173,6 +186,9 @@ def select(policy, client, role='implementation-worker', complexity='medium', ri
         constraints.extend(claude_constraints(runtime, claude_version, requested_model, env, warnings))
         if constraints and runtime != 'unknown':
             method = 'session_preset_required'
+    if client == 'muse':
+        constraints.extend(muse_constraints())
+        method = 'plan_only'
     warnings.append('Policy aliases/tiers are examples; account availability, pricing and applied runtime settings remain unverified')
     return {
         'requested_model': requested_model, 'requested_effort': requested_effort,
@@ -186,7 +202,7 @@ def select(policy, client, role='implementation-worker', complexity='medium', ri
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--policy', type=Path)
-    parser.add_argument('--client', required=True, choices=('codex', 'claude'))
+    parser.add_argument('--client', required=True, choices=('codex', 'claude', 'muse'))
     parser.add_argument('--role', default='implementation-worker')
     parser.add_argument('--stage', help='Actual workflow stage; omitted preserves generic role defaults')
     parser.add_argument('--complexity', choices=('low', 'medium', 'high'), default='medium')
