@@ -22,7 +22,7 @@ Muse needs no native role install and no native install step. Skills load direct
 python3 ~/.agents/skills/shipyard/scripts/install_clients.py --client muse
 ```
 
-`--client both` still means Codex and Claude Code only; Muse is never included in `both`.
+`--client both` still means Codex and Claude Code only; Muse is never included in `both`. See [muse.md](muse.md) for the full Muse host mapping.
 
 ## Optional native role setup
 

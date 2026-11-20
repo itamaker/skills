@@ -31,8 +31,8 @@ a role exists only for the duration of its spawned subagent session.
 ## Tickets: the project task record
 
 A Muse ticket is an entry in the coordinator's project task record (in
-this round, the coordination file / `ALIGNMENT.md` checklist /
-`TASK_RECORD.md` — whichever record the coordinator owns for the project).
+this round, `TASK_RECORD.md` under `~/workspace/shipyard-muse/`; other
+projects use their own record, e.g. an `ALIGNMENT.md` checklist).
 Each ticket carries the fields in [coordination.md](coordination.md):
 owner/coordinator, source, objective, repository/base, allowed files and
 interfaces, dependencies, acceptance, selected checks with rationale, and
@@ -138,9 +138,10 @@ merge.
   stay separate from Codex/Claude. A Muse change never rewrites a
   Codex/Claude section, test, or behavior to accommodate it.
 - **NO MAIN without the user's explicit permission.** Never commit to,
-  merge into, or push `main` (or the main-line branch) without the user
-  explicitly authorizing that merge. Ticket work stays on its ticket
-  branch until the coordinator merges it under that authorization.
+  merge into, or push `main` without the user explicitly authorizing it.
+  Ticket work stays on its ticket branch until the coordinator merges it
+  into the round's main-line branch (here, `shipyard-muse`) under the
+  round's authorization.
 - **Fix Shipyard-on-Muse problems on the branch.** If Shipyard misbehaves
   on Muse (a wrong mapping, a helper that rejects the Muse client, a
   doc that assumes a Codex/Claude-only capability), file it as a ticket
