@@ -190,8 +190,15 @@ def retire_legacy(home, relative, expected):
 
 def install(skill_root, home, client='both', apply=False, tier='inherit', policy=None):
     """Validate every selected source and target before previewing or writing."""
-    if client not in ('codex', 'claude', 'both'):
+    if client not in ('codex', 'claude', 'both', 'muse'):
         raise InstallError(f'Unknown client: {client}')
+    if client == 'muse':
+        # Muse loads skills directly from its local skill directories; there is
+        # no native role install, so this is a reporting no-op by design.
+        return [
+            'Muse needs no native role install: skills load directly from ~/workspace/custom-skills/ and ~/.agents/skills/, kept current by a daily sync from the repository.',
+            'No files were written, backed up, or modified.',
+        ]
     root = Path(skill_root).resolve()
     home = Path(os.path.abspath(Path(home).expanduser()))
     selected = ('codex', 'claude') if client == 'both' else (client,)
@@ -236,7 +243,7 @@ def install(skill_root, home, client='both', apply=False, tier='inherit', policy
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--client', choices=('codex', 'claude', 'both'), default='both')
+    parser.add_argument('--client', choices=('codex', 'claude', 'both', 'muse'), default='both')
     parser.add_argument('--home', type=Path, default=Path.home())
     parser.add_argument('--tier', choices=('inherit', 'economy', 'balanced', 'deep'), default='inherit', help='Optional next-session preset; inherit leaves per-task overrides available')
     parser.add_argument('--policy', type=Path, help='Custom model policy for an explicit preset')

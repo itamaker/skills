@@ -12,6 +12,18 @@ Select **Global** installation scope and the clients you use when asked. For set
 
 Publication and installation are managed by the skills repository. Native role sources are part of this skill, not a separate dotfiles dependency. Installing the Claude plugin makes the skill available; native role installation remains an explicit setup step through the direct global route above.
 
+## Muse
+
+Muse needs no native role install and no native install step. Skills load directly from `~/workspace/custom-skills/` and `~/.agents/skills/`, which a daily sync from the repository keeps current. Nothing is written under `~/.codex` or `~/.claude` for Muse. The Codex/Claude native role setup below does not apply to Muse.
+
+`install_clients.py --client muse` is a reporting no-op: it prints the same report in preview and with `--apply`, writes nothing, and exits 0.
+
+```bash
+python3 ~/.agents/skills/shipyard/scripts/install_clients.py --client muse
+```
+
+`--client both` still means Codex and Claude Code only; Muse is never included in `both`.
+
 ## Optional native role setup
 
 To add personality loading to previously installed native roles, update the skill, preview and apply the native setup below, then start a new session. Subsequent personality switches read the selected Markdown at runtime and require no reinstall.
