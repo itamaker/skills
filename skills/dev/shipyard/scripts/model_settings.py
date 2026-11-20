@@ -77,7 +77,7 @@ def validate(document):
     require(isinstance(document, dict) and not set(document) - {'version', 'clients'}, 'Invalid settings document keys')
     require(type(document.get('version')) is int and document['version'] == 1, 'Settings require version 1')
     clients = document.get('clients', {})
-    require(isinstance(clients, dict) and not set(clients) - {'codex', 'claude'}, 'Unknown settings client')
+    require(isinstance(clients, dict) and not set(clients) - {'codex', 'claude', 'muse'}, 'Unknown settings client')
     result = {'version': 1, 'clients': {}}
     for client, config in clients.items():
         require(isinstance(config, dict) and not set(config) - {'defaults', 'roles', 'stages'}, 'Invalid client settings keys')
@@ -225,7 +225,7 @@ def assemble(client, role, user, project, documents, overrides, warnings, cwd, s
 def resolve(client, role='implementation-worker', *, project=None, user_config=None,
             overrides=None, no_project=False, trust_project=False, cwd=None, stage=None):
     stage = stage_name(stage)
-    require(client in ('codex', 'claude'), 'Unknown client')
+    require(client in ('codex', 'claude', 'muse'), 'Unknown client')
     role = role_name(role)
     user, project_path, warnings, cwd = locations(project, user_config, no_project, trust_project, cwd)
     documents = {path: read_document(path)[0] for path in (user, project_path) if path is not None}
@@ -348,7 +348,7 @@ def batch_operations(operations):
 def configure_batch(client, scope, operations, *, apply=False, project=None, user_config=None,
                     no_project=False, trust_project=False, cwd=None):
     """Validate all final edits, then persist one locked transaction and one backup."""
-    require(client in ('codex', 'claude') and scope in ('user', 'project'), 'Invalid client/scope')
+    require(client in ('codex', 'claude', 'muse') and scope in ('user', 'project'), 'Invalid client/scope')
     operations = batch_operations(operations)
     user, project_path, warnings, cwd = locations(project, user_config, no_project, trust_project, cwd)
     require(scope != 'project' or project_path is not None, 'Project writes require explicit --project or --trust-project inside Git; --no-project-settings disables them')
@@ -417,7 +417,7 @@ def configure(client, action, scope, *, role=None, stage=None, values=None, fiel
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('status', 'set', 'reset'))
-    parser.add_argument('--client', choices=('codex', 'claude'), required=True)
+    parser.add_argument('--client', choices=('codex', 'claude', 'muse'), required=True)
     parser.add_argument('--scope', choices=('user', 'project'))
     parser.add_argument('--role')
     parser.add_argument('--stage', choices=STAGES)
