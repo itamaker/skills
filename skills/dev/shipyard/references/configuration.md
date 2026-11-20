@@ -2,6 +2,8 @@
 
 Claude Code's `/shipyard ...` and Codex's `$shipyard ...` accept both [flat stage parameters](commands.md) and natural-language requests. Parameter inputs are parsed by the bundled helper; the native clients still load the skill rather than implementing a new built-in command. For natural language, follow this map before dispatching or saving settings:
 
+Muse: overrides live in the ticket record only; no settings file; `model_settings.py --client muse` resolves defaults-only; see [muse.md](muse.md).
+
 | User intent | Action and lifetime |
 | --- | --- |
 | "Use deep for this task" | Keep a task override in the coordinator's task record; pass it to plans for new matching agents until task completion/cancellation. No settings file writes. |

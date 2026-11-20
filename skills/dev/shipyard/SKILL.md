@@ -9,6 +9,8 @@ The main conversation owns the user's goal, priorities, integration, and final a
 
 If the text after the skill name (`/shipyard`, `/itamaker-skills:shipyard` in the Claude plugin, or `$shipyard`) begins with `--`, follow [commands.md](references/commands.md) first and pass the literal arguments to the flat-parameter helper. Do not reinterpret malformed flags as natural language or interpolate them into shell code. With no parameters, continue the normal workflow; natural-language requests remain available.
 
+On Muse there is no `/shipyard` or `$shipyard` command: invocation is reading this file plus the references below; see [muse.md](references/muse.md) for the full Muse host mapping.
+
 ## Load only your path
 
 - **Role personality:** for normal delivery, load the current role's working style once at entry using [personas.md](references/personas.md). The primary conversation uses `chief-of-staff`. Resolve the assigned role again when starting a new invocation. Persona commands use the flat-parameter path above.
