@@ -67,7 +67,7 @@ class CheckLessonsTests(unittest.TestCase):
                 count += 1
         self.assertEqual((count, total), (9, 0))
 
-    def test_main_returns_zero_on_seeded_files(self):
+    def test_main_returns_zero_on_shipped_files(self):
         self.assertEqual(checker.main([str(LESSONS_DIR)]), 0)
 
     def test_main_returns_one_on_bad_directory(self):
@@ -136,7 +136,7 @@ class CheckLessonsTests(unittest.TestCase):
 
     def test_banned_absolute_path(self):
         self.assert_error(self.check(VALID.replace('Rework costs more than a question asked up front.',
-                                                   'See the file at /home/hatch/x for rework costs.')),
+                                                   'See the file at /opt/acme/x for rework costs.')),
                           'banned absolute path')
 
     def test_banned_version_number(self):
@@ -153,7 +153,14 @@ class CheckLessonsTests(unittest.TestCase):
         text = VALID.replace('Rework costs more than a question asked up front.',
                              'Rework costs more than the Acme question.')
         self.assertEqual(self.check(text), [])
-        self.assert_error(self.check(text, extra_names=('Acme',)), 'banned name')
+        errors = self.check(text, extra_names=('Acme',))
+        self.assertEqual(len(errors), 1)
+        self.assertIn("banned name: 'Acme'", errors[0])
+        self.assertNotIn('banned banned name', errors[0])
+
+    def test_stray_heading_before_first_section(self):
+        text = VALID.replace('## [pm-001]', '## Notes\n\n## [pm-001]', 1)
+        self.assert_error(self.check(text), 'unexpected heading')
 
     def test_missing_frontmatter(self):
         self.assert_error(self.check(VALID.replace('---\nlessons:\n', '').replace(

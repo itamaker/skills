@@ -5,18 +5,37 @@ next round does not pay for the same mistake twice. This file is the
 protocol; the lessons themselves live in `lessons/<role>.md`, one file
 per role.
 
+The skill ships with empty lessons files: no lessons are bundled, and
+each installation accumulates its own lessons from its own rounds —
+never copy lessons from another installation or seed them from past
+rounds.
+
 ## Entry format
 
 Each role file starts with a YAML frontmatter block listing every
 lesson in the file, in the same order as the body. Each entry carries:
 
 - `id`: stable, `<role-prefix>-NNN` (for example `pm-001`), never reused.
+  The prefix is the first letters of each hyphenated word of the role
+  file's stem (`project-manager` → `pm`, `chief-of-staff` → `cos`):
+
+  | Role file | Prefix |
+  | --- | --- |
+  | `architecture-advisor.md` | `aa` |
+  | `chief-of-staff.md` | `cos` |
+  | `ci-worker.md` | `cw` |
+  | `code-advisor.md` | `ca` |
+  | `deliver-worker.md` | `dw` |
+  | `implementation-worker.md` | `iw` |
+  | `project-manager.md` | `pm` |
+  | `verify-worker.md` | `vw` |
+  | `visual-advisor.md` | `va` |
 - `added`: the date the lesson was merged, `YYYY-MM-DD`.
 - `status`: `active` or `retired`.
 - When retired, also `retired` (date) and `retired_reason`.
 
 The body is the lesson text: one `## [id] Title` section per lesson,
-3–6 lines, with exactly four lines in this order. Example — format
+with exactly four lines in this order. Example — format
 only, not a seeded lesson; it states generic textbook advice:
 
 ```markdown
@@ -114,7 +133,7 @@ not filed.
 ### 2. Lesson lifecycle
 
 Propose (worker or advisor, in the final report) → validate generality
-(advisor, same check as the seed lessons) → merge (coordinator only,
+(advisor, same check as the example entry) → merge (coordinator only,
 assigns `id` and `added`) → read at next entry (every role reads its
 own file before starting) → retire with a date and a reason if later
 evidence contradicts it (`status: retired`, never silently delete). A

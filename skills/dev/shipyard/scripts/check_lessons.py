@@ -62,7 +62,7 @@ def find_banned(text, extra_names=()):
     """Return [(label, match)] for banned identifiers in text."""
     hits = [(label, m.group(0)) for label, pat in BANNED_PATTERNS
             for m in re.finditer(pat, text)]
-    hits += [("banned name", m.group(0)) for name in extra_names
+    hits += [("name", m.group(0)) for name in extra_names
              for m in re.finditer(r"\b" + re.escape(name) + r"\b", text, re.I)]
     return hits
 
@@ -130,6 +130,8 @@ def check_file(path, extra_names=()):
         if section:
             current = {"id": section.group(1), "title": section.group(2) or "", "lines": []}
             sections.append(current)
+        elif line.startswith("## "):
+            errors.append(f"{path}: unexpected heading: {line!r}")
         elif current is not None and line.strip():
             current["lines"].append(line)
     if parse_errors:
