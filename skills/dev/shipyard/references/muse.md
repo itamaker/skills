@@ -134,6 +134,7 @@ merge.
 
 ## Standing rules for this host
 
+- **Lessons:** the per-role lessons files, the round-close harvest, and the harvest record follow [lessons.md](lessons.md); a round's harvest goes in that round's task record (`TASK_RECORD.md` in this round).
 - **Decoupling.** Muse paths, settings keys, tests, and documentation
   stay separate from Codex/Claude. A Muse change never rewrites a
   Codex/Claude section, test, or behavior to accommodate it.

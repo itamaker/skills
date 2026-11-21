@@ -14,6 +14,16 @@ On Muse there is no `/shipyard` or `$shipyard` command: invocation is reading th
 ## Load only your path
 
 - **Role personality:** for normal delivery, load the current role's working style once at entry using [personas.md](references/personas.md). The primary conversation uses `chief-of-staff`. Resolve the assigned role again when starting a new invocation. Persona commands use the flat-parameter path above.
+- **Lessons:** at entry, before starting work, read your own lessons file; the coordinator reads all nine at round start:
+  - chief-of-staff: [lessons/chief-of-staff.md](references/lessons/chief-of-staff.md)
+  - project-manager: [lessons/project-manager.md](references/lessons/project-manager.md)
+  - implementation-worker: [lessons/implementation-worker.md](references/lessons/implementation-worker.md)
+  - architecture-advisor: [lessons/architecture-advisor.md](references/lessons/architecture-advisor.md)
+  - code-advisor: [lessons/code-advisor.md](references/lessons/code-advisor.md)
+  - visual-advisor: [lessons/visual-advisor.md](references/lessons/visual-advisor.md)
+  - verify-worker: [lessons/verify-worker.md](references/lessons/verify-worker.md)
+  - ci-worker: [lessons/ci-worker.md](references/lessons/ci-worker.md)
+  - deliver-worker: [lessons/deliver-worker.md](references/lessons/deliver-worker.md)
 - **Configure models:** for `/shipyard` or `$shipyard` requests to change/show/reset model settings, read [configuration.md](references/configuration.md) first. Map intent to task, one-shot, project, or personal scope; persist only an explicit save request.
 - **Coordinator / PM:** read [coordination.md](references/coordination.md) for dispatch, exclusive ownership, milestones, and recovery. Read [verification.md](references/verification.md) when defining checks or accepting a revision.
 - **Ask-mode replacement:** when the Chief of Staff proposes a staffing change in ask mode, use the [timed notice and handoff procedure](references/replacement-window.md).
