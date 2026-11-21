@@ -64,6 +64,8 @@ class MusePolicyTests(unittest.TestCase):
             with self.subTest(runtime=runtime):
                 result = self.select(runtime=runtime)
                 self.assertEqual(result['application_method'], 'plan_only')
+                self.assertNotIn('session preset', '; '.join(result['constraints']))
+                self.assertIn('Muse has no session-level model preset; the requested model and effort are recorded only', result['constraints'])
                 self.assertIsNone(result['effective_model'])
                 self.assertIsNone(result['effective_effort'])
 
