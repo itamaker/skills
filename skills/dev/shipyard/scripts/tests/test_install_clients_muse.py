@@ -50,6 +50,15 @@ class MuseInstallerTests(unittest.TestCase):
         self.assertFalse((self.home / '.claude').exists())
         self.assertFalse(list(self.home.rglob('*.shipyard-backup-*')))
 
+    def test_muse_policy_is_rejected_not_ignored(self):
+        # A policy file must never be silently ignored for muse, nor loaded
+        # (it is not used): the {} content would fail validation if read.
+        policy = self.root / 'custom-policy.json'
+        policy.write_text('{}')
+        with self.assertRaisesRegex(installer.InstallError, '--policy has no effect for muse'):
+            installer.install(self.package, self.home, 'muse', True, policy=policy)
+        self.assertEqual(self.snapshot(), [])
+
     def test_muse_needs_no_installed_skill_markers(self):
         # The muse branch returns before any marker or asset check runs.
         messages = self.install(apply=True)

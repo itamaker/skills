@@ -193,6 +193,11 @@ def install(skill_root, home, client='both', apply=False, tier='inherit', policy
     if client not in ('codex', 'claude', 'both', 'muse'):
         raise InstallError(f'Unknown client: {client}')
     if client == 'muse':
+        # --policy selects a preset for a native role install, which Muse
+        # has none of; refuse instead of silently ignoring the flag, and
+        # do not load the policy file (it is not used for muse).
+        if policy is not None:
+            raise InstallError('--policy has no effect for muse: Muse loads skills directly, with no native role install and no presets, so no policy file is loaded or used')
         # Muse loads skills directly from its local skill directories; there is
         # no native role install, so this is a reporting no-op by design.
         return [
