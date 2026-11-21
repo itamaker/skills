@@ -10,7 +10,6 @@ whatever pins live under the ``muse`` key, resolved through the same
 policy aliases T1 added to model-policy.json.
 """
 
-import copy
 import importlib.util
 import json
 from pathlib import Path

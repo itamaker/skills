@@ -51,7 +51,7 @@ def validate_policy(policy):
         require(isinstance(values, dict) and set(values) == set(expected), f'Policy auto.{key} has invalid keys')
         require(all(tier in TIERS for tier in values.values()), f'Policy auto.{key} has invalid tiers')
     clients = policy.get('clients')
-    require(isinstance(clients, dict) and (set(clients) == {'codex', 'claude'} or set(clients) == {'codex', 'claude', 'muse'}), 'Policy requires codex and claude clients')
+    require(isinstance(clients, dict) and (set(clients) == {'codex', 'claude'} or set(clients) == {'codex', 'claude', 'muse'}), 'Policy requires codex and claude clients; muse may also be present')
     for client, settings in clients.items():
         require(isinstance(settings, dict), f'Invalid settings for {client}')
         tiers, capabilities = settings.get('tiers'), settings.get('model_capabilities')
@@ -187,6 +187,10 @@ def select(policy, client, role='implementation-worker', complexity='medium', ri
         if constraints and runtime != 'unknown':
             method = 'session_preset_required'
     if client == 'muse':
+        # Muse has no session preset: drop the shared fixed-host wording
+        # (kept for codex/claude above) and record the muse-true position.
+        constraints = [c for c in constraints if 'session preset' not in c]
+        constraints.append('Muse has no session-level model preset; the requested model and effort are recorded only')
         constraints.extend(muse_constraints())
         method = 'plan_only'
     warnings.append('Policy aliases/tiers are examples; account availability, pricing and applied runtime settings remain unverified')

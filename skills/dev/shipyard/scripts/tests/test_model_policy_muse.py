@@ -6,7 +6,6 @@ Muse failure never requires touching codex/claude tests to fix.
 
 import copy
 import importlib.util
-import json
 from pathlib import Path
 import unittest
 
@@ -64,9 +63,7 @@ class MusePolicyTests(unittest.TestCase):
         for runtime in ('unknown', 'fixed', 'spawn', 'session'):
             with self.subTest(runtime=runtime):
                 result = self.select(runtime=runtime)
-                self.assertNotEqual(result['application_method'], 'spawn_overrides')
-                self.assertNotIn('spawn_overrides', json.dumps(result))
-                self.assertNotIn('session_preset', json.dumps(result))
+                self.assertEqual(result['application_method'], 'plan_only')
                 self.assertIsNone(result['effective_model'])
                 self.assertIsNone(result['effective_effort'])
 
