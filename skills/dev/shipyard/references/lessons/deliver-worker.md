@@ -9,6 +9,9 @@ lessons:
   - id: dw-003
     added: 2026-11-23
     status: active
+  - id: dw-004
+    added: 2026-11-23
+    status: active
 ---
 
 # Deliver-worker lessons
@@ -36,3 +39,10 @@ before starting work. Protocol: [lessons.md](../lessons.md).
 - Pattern: Starting the build assuming the toolchain survived, because the workspace files look unchanged.
 - Do instead: Re-verify the build toolchain and required dev packages exist before starting the build/packaging steps; reinstall first if they are gone.
 - Why: An environment replacement wipes installed system packages as well as running processes, so the failure appears mid-ship instead of at setup.
+
+## [dw-004] Verify a shared resource is free before judging the product
+
+- Trigger: A step needs a shared resource (a display, a port).
+- Pattern: Running the step and reading its failure as a product defect.
+- Do instead: Verify the resource is free first — check for a stale holder — and free it or pick another before judging the product.
+- Why: Shared resources outlive the processes that used them.

@@ -6,6 +6,12 @@ lessons:
   - id: iw-002
     added: 2026-11-23
     status: active
+  - id: iw-003
+    added: 2026-11-23
+    status: active
+  - id: iw-004
+    added: 2026-11-23
+    status: active
 ---
 
 # Implementation-worker lessons
@@ -26,3 +32,17 @@ before starting work. Protocol: [lessons.md](../lessons.md).
 - Pattern: Hardcoding the branch under test as the harness target.
 - Do instead: Parameterize the harness target (branch or merge commit) so the same harness runs unmodified on the branch and on main after merge.
 - Why: A hardcoded target forces a patched copy for the post-merge run, and the patch itself becomes something to verify.
+
+## [iw-003] Check the fallback, not just the absent symptom
+
+- Trigger: Removing or scoping a rule that produced a visible symptom.
+- Pattern: Declaring the fix done when the old symptom is gone.
+- Do instead: Inspect the final rendered state and check what the fallback now shows — a scoped rule can expose a default you never wrote.
+- Why: The absence of the old symptom is not proof the new state is correct.
+
+## [iw-004] An evidence record describes only checks the harness ran
+
+- Trigger: Writing the evidence record for a harness run.
+- Pattern: Describing a check the harness never ran as if it passed.
+- Do instead: Record only checks with an artifact behind them; mark unrun checks as not run.
+- Why: Reviewers check artifacts, not prose — a claim without an artifact is not evidence.

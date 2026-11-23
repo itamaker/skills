@@ -9,6 +9,12 @@ lessons:
   - id: pm-003
     added: 2026-11-23
     status: active
+  - id: pm-004
+    added: 2026-11-23
+    status: active
+  - id: pm-005
+    added: 2026-11-23
+    status: active
 ---
 
 # Project-manager lessons
@@ -36,3 +42,17 @@ before starting work. Protocol: [lessons.md](../lessons.md).
 - Pattern: Merging both and treating the conflict resolution as mechanical.
 - Do instead: Merge sequentially; the coordinator resolves the conflict at merge time and re-verifies the merged result (tests plus the shared invariant the file expresses).
 - Why: A conflict in a shared file is where two lanes' assumptions meet, and only the merged result shows whether both still hold.
+
+## [pm-004] "Ready for review" is a request for review, not a review
+
+- Trigger: A worker reports "ready for review" but cannot invoke reviewers itself.
+- Pattern: Treating "ready for review" as reviewed and merging.
+- Do instead: The coordinator obtains the review itself before merging; "ready for review" is a request for review, not a review.
+- Why: Review coverage is the coordinator's responsibility when the worker has no way to obtain it.
+
+## [pm-005] A post-GO suggestion needs the reviewer's stated re-proof, nothing more
+
+- Trigger: A reviewer returns GO with an optional hardening suggestion.
+- Pattern: Either ignoring the suggestion silently or demanding a full re-review after adopting it.
+- Do instead: Adopt it only if the reviewer stated what re-proof suffices — if they did not, ask them to name it rather than guessing — run exactly that, and record it.
+- Why: The reviewer's stated re-proof is the contract for the change; anything more wastes a review cycle, anything less leaves it unproven.
