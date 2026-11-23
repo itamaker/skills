@@ -56,8 +56,11 @@ class CheckLessonsTests(unittest.TestCase):
                         f"expected {fragment!r} in {errors}")
 
     def test_role_files_pass(self):
-        # Seeding is on hold: the shipped role files are empty, and an
-        # empty lessons list is valid. Nine files, zero lessons.
+        # The shipped role files must pass the checker. The lesson
+        # count is whatever rounds have filed so far; it is not
+        # fixed — lessons accumulate over rounds, so assert the
+        # file count (nine) and that every file passes, not a
+        # particular total.
         total, count = 0, 0
         for path in sorted(LESSONS_DIR.glob('*.md')):
             with self.subTest(path=path.name):
@@ -65,7 +68,7 @@ class CheckLessonsTests(unittest.TestCase):
                 self.assertEqual(errors, [])
                 total += lessons
                 count += 1
-        self.assertEqual((count, total), (9, 0))
+        self.assertEqual(count, 9)
 
     def test_main_returns_zero_on_shipped_files(self):
         self.assertEqual(checker.main([str(LESSONS_DIR)]), 0)
