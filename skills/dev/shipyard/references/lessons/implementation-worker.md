@@ -12,6 +12,9 @@ lessons:
   - id: iw-004
     added: 2026-11-23
     status: active
+  - id: iw-005
+    added: 2026-11-24
+    status: active
 ---
 
 # Implementation-worker lessons
@@ -46,3 +49,10 @@ before starting work. Protocol: [lessons.md](../lessons.md).
 - Pattern: Describing a check the harness never ran as if it passed.
 - Do instead: Record only checks with an artifact behind them; mark unrun checks as not run.
 - Why: Reviewers check artifacts, not prose — a claim without an artifact is not evidence.
+
+## [iw-005] Preserve an interrupted run's partial output before re-running it
+
+- Trigger: A long-running query or analysis is cancelled mid-run.
+- Pattern: Re-running it overwrites its output file, so the cancellation itself leaves no artifact.
+- Do instead: Copy or rename the cancelled run's output file (or its partial output) to a preserved name before the re-run.
+- Why: The interruption is itself evidence — what was running and how far it got — and once overwritten it can only be described in prose.
