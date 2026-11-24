@@ -44,6 +44,11 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(any('Would install global asset' in m for m in messages))
         self.assertFalse((self.home / '.codex').exists())
 
+    def test_both_excludes_muse(self):
+        messages = self.install(client='both', apply=False)
+        self.assertFalse(any('muse' in m.lower() for m in messages))
+        self.assertTrue(any('Would install global asset' in m for m in messages))
+
     def test_fresh_install_copies_only_allowlist_and_sets_launcher_mode(self):
         self.install()
         for client in ('codex', 'claude'):

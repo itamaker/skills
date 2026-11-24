@@ -16,4 +16,10 @@ Repository-required checks override this default placement; the coordinator reco
 
 Without CI, CoS assigns **one integration verification task** for the combined candidate to `verify-worker` or performs it directly. Record the exact revision/environment and full-suite result; implementation workers still run only related checks. Use `ci-worker` for actual pipeline/runner/environment failures, not as a watcher of healthy deterministic jobs. Establish CI when repeated integration verification becomes the bottleneck.
 
+Muse: GitHub Actions are not assumed; when they are unavailable for the repository at hand, use the without-CI mapping above; see [muse.md](muse.md).
+
 The PM/CoS owns acceptance; CI proves automated checks, not all product requirements. Use independent functional verification for high-risk user behavior. Reuse current check/review artifacts, summarize failures, and request specialist analysis only after bounded investigation cannot resolve the problem.
+
+## Proposed lessons
+
+An advisor validating a proposed lesson checks generality, not just correctness: the lesson must hold outside the project it came from — no project names, repo paths, commit hashes, version numbers, or product-specific identifiers — and must not duplicate a lesson already in the role's file. A lesson that cannot be stated without one of those is rejected, not filed. The entry format and lifecycle are in [lessons.md](lessons.md).
