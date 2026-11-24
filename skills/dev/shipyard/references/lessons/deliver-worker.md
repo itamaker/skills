@@ -12,6 +12,9 @@ lessons:
   - id: dw-004
     added: 2026-11-23
     status: active
+  - id: dw-005
+    added: 2026-11-24
+    status: active
 ---
 
 # Deliver-worker lessons
@@ -46,3 +49,10 @@ before starting work. Protocol: [lessons.md](../lessons.md).
 - Pattern: Running the step and reading its failure as a product defect.
 - Do instead: Verify the resource is free first — check for a stale holder — and free it or pick another before judging the product.
 - Why: Shared resources outlive the processes that used them.
+
+## [dw-005] Verify a synced copy with diff before trusting it
+
+- Trigger: Syncing an installed or deployed copy from a source tree.
+- Pattern: Using a destructive sync (delete mode) with a filter set, and assuming the result matches the source.
+- Do instead: Copy from the source without delete mode, or first prove the filter set with a dry run; then diff the target against the source and confirm zero unexpected differences before running anything from it.
+- Why: A sync that deletes is indistinguishable from a successful sync until something reads the missing file, and by then the damage looks like a defect in the target.
