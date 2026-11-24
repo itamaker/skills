@@ -15,6 +15,9 @@ lessons:
   - id: iw-005
     added: 2026-11-24
     status: active
+  - id: iw-006
+    added: 2026-11-24
+    status: active
 ---
 
 # Implementation-worker lessons
@@ -56,3 +59,10 @@ before starting work. Protocol: [lessons.md](../lessons.md).
 - Pattern: Re-running it overwrites its output file, so the cancellation itself leaves no artifact.
 - Do instead: Copy or rename the cancelled run's output file (or its partial output) to a preserved name before the re-run.
 - Why: The interruption is itself evidence — what was running and how far it got — and once overwritten it can only be described in prose.
+
+## [iw-006] A content ban covers comments and strings, not just executable code
+
+- Trigger: A standing rule bans certain content from code.
+- Pattern: Writing the banned content into comments or string literals, assuming the ban covers only executable code.
+- Do instead: Treat comments, strings, and docs-in-code as code for the ban's scope.
+- Why: Reviewers and checkers read comments too; a ban that leaks into comments is not a ban.

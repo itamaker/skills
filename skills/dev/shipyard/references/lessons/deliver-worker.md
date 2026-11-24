@@ -15,6 +15,12 @@ lessons:
   - id: dw-005
     added: 2026-11-24
     status: active
+  - id: dw-006
+    added: 2026-11-24
+    status: active
+  - id: dw-007
+    added: 2026-11-24
+    status: active
 ---
 
 # Deliver-worker lessons
@@ -56,3 +62,17 @@ before starting work. Protocol: [lessons.md](../lessons.md).
 - Pattern: Using a destructive sync (delete mode) with a filter set, and assuming the result matches the source.
 - Do instead: Copy from the source without delete mode, or first prove the filter set with a dry run; then diff the target against the source and confirm zero unexpected differences before running anything from it.
 - Why: A sync that deletes is indistinguishable from a successful sync until something reads the missing file, and by then the damage looks like a defect in the target.
+
+## [dw-006] Merge from the target checkout, not a side worktree
+
+- Trigger: A delivery step must merge a feature branch into the target branch.
+- Pattern: Attempting the merge from a side worktree, leaving the target checkout's index stale (phantom staged changes).
+- Do instead: Run the merge with the target branch checked out; keep all other work out of that checkout.
+- Why: The merge records correctly and the target checkout stays clean for verification.
+
+## [dw-007] Restrict a version bump to live version declarations
+
+- Trigger: A release bump rewrites version strings mechanically across files.
+- Pattern: The rewrite also touches historical mentions of past versions, corrupting the record.
+- Do instead: Restrict the rewrite to live version declarations; revert any historical mention it touched.
+- Why: History must keep referring to the release it happened in.
