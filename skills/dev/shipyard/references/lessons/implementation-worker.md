@@ -33,6 +33,9 @@ lessons:
   - id: iw-011
     added: 2026-11-25
     status: active
+  - id: iw-012
+    added: 2026-11-25
+    status: active
 ---
 
 # Implementation-worker lessons
@@ -116,3 +119,10 @@ before starting work. Protocol: [lessons.md](../lessons.md).
 - Pattern: Implementing against the draft number remembered from earlier work.
 - Do instead: Fetch the current published text and confirm the number first.
 - Why: Draft numbers change on publication, and an implementation built to a superseded draft silently diverges from the live spec.
+
+## [iw-012] Judge a lane's scope on the merge diff, not on the post-merge tree
+
+- Trigger: A harness scope check diffs a base commit against a tree that already contains other lanes.
+- Pattern: Treating the scope failure as a lane overreach.
+- Do instead: Evaluate scope on the merge diff (merge-base to branch tip); record a base-comparison failure on the merged tree as a harness artifact, not a scope violation.
+- Why: The merged tree legitimately contains other lanes' files, so a tree-versus-base diff cannot distinguish this lane's scope.
