@@ -15,6 +15,9 @@ lessons:
   - id: pm-005
     added: 2026-11-23
     status: active
+  - id: pm-006
+    added: 2026-11-25
+    status: active
 ---
 
 # Project-manager lessons
@@ -56,3 +59,10 @@ before starting work. Protocol: [lessons.md](../lessons.md).
 - Pattern: Either ignoring the suggestion silently or demanding a full re-review after adopting it.
 - Do instead: Adopt it only if the reviewer stated what re-proof suffices — if they did not, ask them to name it rather than guessing — run exactly that, and record it.
 - Why: The reviewer's stated re-proof is the contract for the change; anything more wastes a review cycle, anything less leaves it unproven.
+
+## [pm-006] A blocked review channel is neither a review nor a reason to freeze
+
+- Trigger: The coordinator cannot reach any reviewer — the review channel itself has failed, not merely a worker that cannot invoke one.
+- Pattern: Stalling the round waiting for the channel, or merging the work unreviewed.
+- Do instead: Verify the work yourself where the rules allow, record exactly what could not be independently reviewed, and report the block upward.
+- Why: A blocked channel is not a review, but it is also not a reason to freeze the round — the work can still be checked within authority and the gap made explicit.

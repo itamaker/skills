@@ -18,6 +18,21 @@ lessons:
   - id: iw-006
     added: 2026-11-24
     status: active
+  - id: iw-007
+    added: 2026-11-25
+    status: active
+  - id: iw-008
+    added: 2026-11-25
+    status: active
+  - id: iw-009
+    added: 2026-11-25
+    status: active
+  - id: iw-010
+    added: 2026-11-25
+    status: active
+  - id: iw-011
+    added: 2026-11-25
+    status: active
 ---
 
 # Implementation-worker lessons
@@ -66,3 +81,38 @@ before starting work. Protocol: [lessons.md](../lessons.md).
 - Pattern: Writing the banned content into comments or string literals, assuming the ban covers only executable code.
 - Do instead: Treat comments, strings, and docs-in-code as code for the ban's scope.
 - Why: Reviewers and checkers read comments too; a ban that leaks into comments is not a ban.
+
+## [iw-007] Return the same shape on every path, including error paths
+
+- Trigger: An operation returns a structured result with named fields.
+- Pattern: Success paths include a field that error paths omit, so consumers must branch on whether the field is present.
+- Do instead: Return the same fields on every path, empty when there is nothing to report.
+- Why: A consumer that assumes the field exists breaks on the error path, and the break surfaces far from the omission.
+
+## [iw-008] When the defect is a missing key, assert presence and type, not just a count
+
+- Trigger: Writing a test for a defect where a field is missing from a result.
+- Pattern: Asserting only that a count is zero — a nil collection also has length zero, so the test passes on the broken code.
+- Do instead: Assert the field is present and of the right type (an empty array, not nil).
+- Why: A count assertion cannot discriminate a missing key from an empty one; only a presence-and-type assertion can.
+
+## [iw-009] Test emptiness on the normalised form, not the raw value
+
+- Trigger: Deciding whether a value is empty or meaningless.
+- Pattern: Testing the raw value, which looks non-empty.
+- Do instead: Apply the same normalisation the matcher uses first, then test the normalised form.
+- Why: A value can be non-empty raw and empty after normalisation, and the raw check misses it.
+
+## [iw-010] Before implementing a capability, search for an existing unwired implementation; if one exists, build only the seam
+
+- Trigger: A lane to add a capability.
+- Pattern: Implementing the capability from scratch.
+- Do instead: Search the codebase first for an existing implementation behind a missing seam; if one exists, build only the wiring.
+- Why: Re-implementing what exists wastes the lane and risks two divergent implementations of one capability.
+
+## [iw-011] Confirm the current published number of a numbered spec before implementing against it; do not implement from a remembered draft number
+
+- Trigger: Implementing against a numbered specification.
+- Pattern: Implementing against the draft number remembered from earlier work.
+- Do instead: Fetch the current published text and confirm the number first.
+- Why: Draft numbers change on publication, and an implementation built to a superseded draft silently diverges from the live spec.
